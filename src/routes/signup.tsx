@@ -1,0 +1,3 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { SignUpScreen } from "@/components/auth/AuthScreens";
+export const Route = createFileRoute("/signup")({ head: () => ({ meta: [{ title: "Create Resident Account | Red-E Now" }, { name: "description", content: "Create a Red-E Now resident account for your building." }, { property: "og:title", content: "Create Resident Account | Red-E Now" }, { property: "og:description", content: "Join your building on Red-E Now." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }), component: SignUpScreen });
