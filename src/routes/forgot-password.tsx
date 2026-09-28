@@ -1,0 +1,3 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { RecoveryScreen } from "@/components/auth/AuthScreens";
+export const Route = createFileRoute("/forgot-password")({ head: () => ({ meta: [{ title: "Resident Password Recovery | Red-E Now" }, { name: "description", content: "Recover access to your Red-E Now resident account." }, { property: "og:title", content: "Resident Password Recovery | Red-E Now" }, { property: "og:description", content: "Recover your resident account access." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }), component: () => <RecoveryScreen role="resident" /> });

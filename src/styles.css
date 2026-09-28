@@ -142,3 +142,45 @@
     color: var(--color-foreground);
   }
 }
+
+@theme inline {
+  --font-display: "Barlow Condensed", sans-serif;
+  --font-sans: "Jost", sans-serif;
+  --font-mono: "DM Mono", monospace;
+  --color-success: var(--success);
+  --color-info: var(--info);
+  --color-prepared: var(--prepared);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-overlay: var(--overlay);
+  --shadow-card: 0 1px 3px var(--shadow-tone);
+}
+:root {
+  --radius: 0.75rem;
+  --background: #f7f7f4;
+  --foreground: #1a1a1a;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1a;
+  --primary: #c8102e;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f3f0;
+  --secondary-foreground: #1a1a1a;
+  --muted: #f3f3f0;
+  --muted-foreground: #6b7280;
+  --accent: #f3f3f0;
+  --accent-foreground: #1a1a1a;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #c8102e;
+  --success: #16a34a;
+  --info: #2563eb;
+  --prepared: #c45d1a;
+  --warning-foreground: #a16207;
+  --overlay: rgb(26 26 26 / 45%);
+  --shadow-tone: rgb(0 0 0 / 8%);
+}
+body { font-family: "Jost", sans-serif; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
