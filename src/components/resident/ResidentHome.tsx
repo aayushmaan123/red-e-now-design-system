@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { CalendarDays, Clock3, History, House, Package, UserRound, ArrowRight, LogOut } from "lucide-react";
+import { CalendarDays, Clock3, History, House, Package, UserRound, LogOut } from "lucide-react";
 import { Avatar, Button, Card, EmptyState } from "@/components/common";
 import { useAuth } from "@/hooks/useAuth";
 const tabs = [{ name: "Home", icon: House }, { name: "Packages", icon: Package }, { name: "Schedule", icon: CalendarDays }, { name: "History", icon: History }, { name: "Profile", icon: UserRound }] as const;
