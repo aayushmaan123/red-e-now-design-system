@@ -1,0 +1,4 @@
+- [ ] Build shared Red-E Now design tokens and controls
+- [ ] Add mock resident/staff sign-in, sign-up, and recovery screens
+- [ ] Add protected resident and staff dashboards with navigation and empty states
+- [ ] Verify the live flows and page metadata
