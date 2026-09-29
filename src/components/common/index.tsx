@@ -1,5 +1,5 @@
-import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, useState } from "react";
-import { X, LoaderCircle, type LucideIcon } from "lucide-react";
+import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, useState, useEffect, useRef } from "react";
+import { X, LoaderCircle, Package, Clock3, ChevronUp, ChevronDown, ChevronsUpDown, Search, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Button({ variant = "primary", size = "md", fullWidth, className, children, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "destructive"; size?: "sm" | "md" | "lg"; fullWidth?: boolean }) {
@@ -116,4 +116,163 @@ export function TabBar({ items, activeTab, onTabChange, className }: { items: re
       ))}
     </div>
   </nav>;
+}
+
+export function PackageCard({ carrierName, trackingCode, status, arrivedAt, description, recipientName, recipientUnit, onClick, className }: {
+  carrierName: string; trackingCode?: string; status: "received" | "available" | "scheduled" | "prepared" | "picked_up";
+  arrivedAt: string; description?: string; recipientName?: string; recipientUnit?: string; onClick?: () => void; className?: string;
+}) {
+  return <Card hover={!!onClick} className={className}>
+    <div className={cn("p-4", onClick && "cursor-pointer")} onClick={onClick}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <Package size={18} className="shrink-0 text-muted-foreground" />
+          <span className="font-medium">{carrierName}</span>
+        </div>
+        <StatusBadge status={status} />
+      </div>
+      {trackingCode && <p className="mt-1 truncate pl-[30px] font-mono text-xs text-muted-foreground">{trackingCode}</p>}
+      <p className="mt-1.5 text-sm text-muted-foreground">
+        {description && <>{description} · </>}Arrived {arrivedAt}
+      </p>
+      {recipientName && <>
+        <div className="my-2.5 border-t border-border" />
+        <p className="text-sm"><span className="font-medium">{recipientName}</span>{recipientUnit && <span className="text-muted-foreground"> · {recipientUnit}</span>}</p>
+      </>}
+    </div>
+  </Card>;
+}
+
+export function AppointmentCard({ date, timeSlot, packageCount, status, residentName, residentUnit, onAction, actionLabel, onClick, className }: {
+  date: string; timeSlot: string; packageCount: number; status: "scheduled" | "prepared" | "picked_up";
+  residentName?: string; residentUnit?: string; onAction?: () => void; actionLabel?: string; onClick?: () => void; className?: string;
+}) {
+  return <Card hover={!!onClick} className={className}>
+    <div className={cn("p-4", onClick && "cursor-pointer")} onClick={onClick}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <Clock3 size={18} className="shrink-0 text-muted-foreground" />
+          <span className="font-medium">{date}</span>
+        </div>
+        <StatusBadge status={status} />
+      </div>
+      <p className="mt-1 pl-[30px] text-sm text-muted-foreground">{timeSlot}</p>
+      <div className="mt-2.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+        <Package size={14} className="shrink-0" />
+        <span>{packageCount} package{packageCount !== 1 ? "s" : ""}</span>
+      </div>
+      {residentName && <p className="mt-1.5 text-sm"><span className="font-medium">{residentName}</span>{residentUnit && <span className="text-muted-foreground"> · {residentUnit}</span>}</p>}
+      {onAction && actionLabel && <div className="mt-3 flex justify-end">
+        <Button size="sm" variant={actionLabel === "Cancel" ? "destructive" : "primary"} onClick={e => { e.stopPropagation(); onAction(); }}>{actionLabel}</Button>
+      </div>}
+    </div>
+  </Card>;
+}
+
+export type Column<T> = {
+  key: string; header: string; render?: (row: T) => ReactNode; sortable?: boolean; width?: string; align?: "left" | "center" | "right";
+};
+
+export function Table<T>({ columns, data, keyExtractor, sortKey, sortDir, onSort, onRowClick, emptyMessage, className }: {
+  columns: Column<T>[]; data: T[]; keyExtractor: (row: T) => string; sortKey?: string; sortDir?: "asc" | "desc";
+  onSort?: (key: string) => void; onRowClick?: (row: T) => void; emptyMessage?: string; className?: string;
+}) {
+  const align = (a?: string) => a === "center" ? "text-center" : a === "right" ? "text-right" : "text-left";
+  return <div className={cn("overflow-x-auto rounded-xl border border-border bg-card", className)}>
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="bg-secondary">
+          {columns.map(col => (
+            <th key={col.key} style={col.width ? { width: col.width } : undefined}
+              className={cn("px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground", align(col.align), col.sortable && onSort && "cursor-pointer select-none hover:text-foreground")}
+              onClick={col.sortable && onSort ? () => onSort(col.key) : undefined}>
+              <span className="inline-flex items-center gap-1">
+                {col.header}
+                {col.sortable && sortKey === col.key
+                  ? (sortDir === "asc" ? <ChevronUp size={12} /> : <ChevronDown size={12} />)
+                  : col.sortable && <ChevronsUpDown size={12} className="opacity-0 group-hover:opacity-40" />}
+              </span>
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {data.length === 0
+          ? <tr><td colSpan={columns.length} className="px-4 py-10 text-center text-muted-foreground">{emptyMessage || "No data"}</td></tr>
+          : data.map(row => (
+            <tr key={keyExtractor(row)} onClick={onRowClick ? () => onRowClick(row) : undefined}
+              className={cn("border-t border-border transition-colors", onRowClick && "cursor-pointer hover:bg-secondary/50")}>
+              {columns.map(col => (
+                <td key={col.key} style={col.width ? { width: col.width } : undefined} className={cn("px-4 py-3", align(col.align))}>
+                  {col.render ? col.render(row) : (row as Record<string, unknown>)[col.key] as ReactNode}
+                </td>
+              ))}
+            </tr>
+          ))}
+      </tbody>
+    </table>
+  </div>;
+}
+
+export function Drawer({ open, onClose, title, children, side = "right", width = "max-w-md", className }: {
+  open: boolean; onClose: () => void; title?: string; children: ReactNode; side?: "right" | "bottom"; width?: string; className?: string;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return <>
+    <div className="fixed inset-0 z-40 bg-overlay animate-fade-in" onClick={onClose} />
+    <div role="dialog" aria-modal="true" aria-label={title} className={cn(
+      side === "right"
+        ? `fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-border bg-card shadow-xl animate-slide-in-from-right ${width}`
+        : "fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-2xl border-t border-border bg-card shadow-xl animate-slide-in-from-bottom",
+      className
+    )}>
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
+        {title && <h2 className="font-display text-lg font-semibold uppercase">{title}</h2>}
+        <Button variant="ghost" size="sm" aria-label="Close drawer" onClick={onClose} className="ml-auto size-8 p-0"><X size={18} /></Button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-6 py-4">{children}</div>
+    </div>
+  </>;
+}
+
+export function SearchField({ value, onChange, placeholder = "Search...", debounceMs = 0, className }: { value: string; onChange: (value: string) => void; placeholder?: string; debounceMs?: number; className?: string }) {
+  const [draft, setDraft] = useState(value);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+  useEffect(() => { setDraft(value); }, [value]);
+  useEffect(() => {
+    if (debounceMs <= 0 || draft === value) return;
+    const timer = setTimeout(() => onChangeRef.current(draft), debounceMs);
+    return () => clearTimeout(timer);
+  }, [draft, value, debounceMs]);
+  const update = (next: string) => { setDraft(next); if (debounceMs <= 0) onChange(next); };
+  const clear = () => { setDraft(""); onChange(""); };
+
+  return <div className={cn("relative", className)}>
+    <Search size={18} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+    <input type="text" value={draft} onChange={e => update(e.target.value)} placeholder={placeholder} aria-label={placeholder} className="h-11 w-full rounded-lg border border-input bg-card pl-10 pr-10 text-sm text-foreground outline-none transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15" />
+    {draft && <button type="button" aria-label="Clear search" onClick={clear} className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"><X size={16} /></button>}
+  </div>;
+}
+
+export function ConfirmPrompt({ title, message, confirmLabel = "Confirm", cancelLabel = "Cancel", variant = "destructive", onConfirm, onCancel, loading }: { title: string; message: string; confirmLabel?: string; cancelLabel?: string; variant?: "destructive" | "primary"; onConfirm: () => void; onCancel: () => void; loading?: boolean }) {
+  return <div className="fixed inset-0 z-40 flex items-center justify-center bg-overlay px-4 animate-fade-in" onMouseDown={onCancel}>
+    <div role="alertdialog" aria-modal="true" aria-label={title} onMouseDown={e => e.stopPropagation()} className="w-full max-w-sm rounded-xl bg-card p-6 shadow-xl animate-float-up">
+      <h2 className="font-display text-xl font-semibold uppercase">{title}</h2>
+      <p className="mt-2 text-sm text-muted-foreground">{message}</p>
+      <div className="mt-6 flex justify-end gap-2">
+        <Button type="button" variant="secondary" onClick={onCancel}>{cancelLabel}</Button>
+        <Button type="button" variant={variant} onClick={onConfirm} disabled={loading} aria-busy={loading}>
+          {loading && <LoadingSpinner className="size-4 text-current" />}{confirmLabel}
+        </Button>
+      </div>
+    </div>
+  </div>;
 }
