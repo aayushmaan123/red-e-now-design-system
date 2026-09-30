@@ -29,8 +29,10 @@ export function TextInput({ label, error, helperText, className, id, ...props }:
   </div>;
 }
 
-export function Card({ children, className, hover = false }: { children: ReactNode; className?: string; hover?: boolean }) {
-  return <div className={cn(
+export function Card({ children, className, hover = false, onClick }: { children: ReactNode; className?: string; hover?: boolean; onClick?: () => void }) {
+  return <div onClick={onClick} onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
+    tabIndex={onClick ? 0 : undefined} role={onClick ? "button" : undefined}
+    className={cn(
     "rounded-xl border border-border bg-card shadow-card transition-all duration-300",
     hover && "hover:shadow-lg hover:-translate-y-0.5 hover:border-primary/20 cursor-pointer",
     className
@@ -75,6 +77,12 @@ export function Toast({ kind, message, onClose }: { kind: "success" | "error" | 
 }
 
 export function Modal({ title, children, onClose, actions }: { title: string; children: ReactNode; onClose: () => void; actions?: ReactNode }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   return <div className="fixed inset-0 z-40 flex items-center justify-center bg-overlay px-4 animate-fade-in" onMouseDown={onClose}>
     <div role="dialog" aria-modal="true" aria-label={title} onMouseDown={e => e.stopPropagation()} className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl animate-float-up">
       <div className="mb-5 flex items-start justify-between gap-4">
@@ -97,15 +105,27 @@ export function Avatar({ name, src }: { name: string; src?: string }) {
 }
 
 export function TabBar({ items, activeTab, onTabChange, className }: { items: readonly { name: string; icon: LucideIcon }[]; activeTab: string; onTabChange: (name: string) => void; className?: string }) {
+  const handleKeyDown = (e: React.KeyboardEvent, idx: number) => {
+    let next = idx;
+    if (e.key === "ArrowRight") next = (idx + 1) % items.length;
+    else if (e.key === "ArrowLeft") next = (idx - 1 + items.length) % items.length;
+    else return;
+    e.preventDefault();
+    onTabChange(items[next].name);
+    (e.currentTarget.parentElement?.children[next] as HTMLElement)?.focus();
+  };
+
   return <nav aria-label="Tab navigation" className={cn(
     "fixed inset-x-0 bottom-0 z-20 border-t border-border/30 bg-card/80 backdrop-blur-xl backdrop-saturate-150 transition-theme",
     "pb-[env(safe-area-inset-bottom,0px)]",
     className
   )}>
-    <div className="mx-auto grid h-[50px] px-2" style={{ gridTemplateColumns: `repeat(${items.length}, 1fr)` }}>
-      {items.map(item => (
-        <button key={item.name} type="button" role="tab" aria-selected={activeTab === item.name} aria-current={activeTab === item.name ? "page" : undefined}
+    <div role="tablist" className="mx-auto grid h-[50px] px-2" style={{ gridTemplateColumns: `repeat(${items.length}, 1fr)` }}>
+      {items.map((item, i) => (
+        <button key={item.name} type="button" role="tab" aria-selected={activeTab === item.name}
+          tabIndex={activeTab === item.name ? 0 : -1}
           onClick={() => onTabChange(item.name)}
+          onKeyDown={e => handleKeyDown(e, i)}
           className={cn(
             "flex h-full flex-col items-center justify-center gap-0.5 rounded-none border-none bg-transparent px-1 text-[10px] font-medium tracking-wide transition-colors duration-200",
             activeTab === item.name ? "text-primary" : "text-muted-foreground active:text-foreground"
@@ -122,8 +142,8 @@ export function PackageCard({ carrierName, trackingCode, status, arrivedAt, desc
   carrierName: string; trackingCode?: string; status: "received" | "available" | "scheduled" | "prepared" | "picked_up";
   arrivedAt: string; description?: string; recipientName?: string; recipientUnit?: string; onClick?: () => void; className?: string;
 }) {
-  return <Card hover={!!onClick} className={className}>
-    <div className={cn("p-4", onClick && "cursor-pointer")} onClick={onClick}>
+  return <Card hover={!!onClick} onClick={onClick} {...(className ? { className } : {})}>
+    <div className="p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <Package size={18} className="shrink-0 text-muted-foreground" />
@@ -147,8 +167,8 @@ export function AppointmentCard({ date, timeSlot, packageCount, status, resident
   date: string; timeSlot: string; packageCount: number; status: "scheduled" | "prepared" | "picked_up";
   residentName?: string; residentUnit?: string; onAction?: () => void; actionLabel?: string; onClick?: () => void; className?: string;
 }) {
-  return <Card hover={!!onClick} className={className}>
-    <div className={cn("p-4", onClick && "cursor-pointer")} onClick={onClick}>
+  return <Card hover={!!onClick} onClick={onClick} {...(className ? { className } : {})}>
+    <div className="p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <Clock3 size={18} className="shrink-0 text-muted-foreground" />
@@ -263,6 +283,12 @@ export function SearchField({ value, onChange, placeholder = "Search...", deboun
 }
 
 export function ConfirmPrompt({ title, message, confirmLabel = "Confirm", cancelLabel = "Cancel", variant = "destructive", onConfirm, onCancel, loading }: { title: string; message: string; confirmLabel?: string; cancelLabel?: string; variant?: "destructive" | "primary"; onConfirm: () => void; onCancel: () => void; loading?: boolean }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onCancel]);
+
   return <div className="fixed inset-0 z-40 flex items-center justify-center bg-overlay px-4 animate-fade-in" onMouseDown={onCancel}>
     <div role="alertdialog" aria-modal="true" aria-label={title} onMouseDown={e => e.stopPropagation()} className="w-full max-w-sm rounded-xl bg-card p-6 shadow-xl animate-float-up">
       <h2 className="font-display text-xl font-semibold uppercase">{title}</h2>

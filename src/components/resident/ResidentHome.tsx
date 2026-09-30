@@ -4,24 +4,41 @@ import { CalendarDays, Clock3, History, House, Moon, Package, Sun, UserRound, Lo
 import { Avatar, Button, Card, EmptyState, TabBar } from "@/components/common";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
+import { SparklesCore } from "@/components/ui/sparkles";
+import { ParticlesProvider } from "@tsparticles/react";
+import { loadSlim } from "@tsparticles/slim";
 
-const tabs = [{ name: "Home", icon: House }, { name: "Packages", icon: Package }, { name: "Schedule", icon: CalendarDays }, { name: "History", icon: History }, { name: "Profile", icon: UserRound }] as const;
+const tabs = [{ name: "Home", icon: House }, { name: "Packages", icon: Package }, { name: "Schedule", icon: CalendarDays }, { name: "Pickups", icon: History }, { name: "Profile", icon: UserRound }] as const;
 
 export function ResidentHome() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toggle, isDark } = useTheme();
   const [tab, setTab] = useState<(typeof tabs)[number]["name"]>("Home");
-  const date = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
-
   return (
-    <div className="min-h-screen bg-background pb-20 transition-theme">
-      <header className="border-b border-border bg-card transition-theme">
-        <div className="mx-auto flex h-17 max-w-5xl items-center justify-between px-6">
+    <div className="relative min-h-screen bg-background pb-20 transition-theme overflow-hidden">
+      {isDark && (
+        <ParticlesProvider init={async (engine) => { await loadSlim(engine); }}>
+          <div className="pointer-events-none fixed inset-0 z-0">
+            <SparklesCore
+              id="dashboard-sparkles"
+              background="transparent"
+              minSize={0.4}
+              maxSize={1.2}
+              particleDensity={50}
+              className="h-full w-full"
+              particleColor="#E8344D"
+              speed={0.8}
+            />
+          </div>
+        </ParticlesProvider>
+      )}
+      <header className="relative z-10 border-b border-border bg-card transition-theme">
+        <div className="mx-auto flex h-17 max-w-5xl items-center justify-center px-6 relative">
           <span className="font-display text-[27px] font-bold uppercase leading-none text-primary">
-            Red-E Now<span className="text-foreground">.</span>
+            Red-E Now
           </span>
-          <div className="flex items-center gap-2">
+          <div className="absolute right-6 flex items-center gap-2">
             <Button variant="ghost" size="sm" className="size-9 rounded-full p-0" aria-label="Toggle theme" onClick={toggle}>
               {isDark ? <Sun size={18} strokeWidth={1.8} /> : <Moon size={18} strokeWidth={1.8} />}
             </Button>
@@ -32,9 +49,8 @@ export function ResidentHome() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-6 pb-10 pt-8">
-        <div className="mb-8 animate-fade-in-up">
-          <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{date}</p>
+      <main className="relative z-10 mx-auto max-w-5xl px-6 pb-10 pt-8">
+        <div className="mb-8 text-center animate-fade-in-up">
           <h1 className="font-display text-[37px] font-semibold uppercase leading-none sm:text-[44px]">
             {tab === "Home" ? `Welcome back, ${user?.name.split(" ")[0] || "Resident"}` : tab}
           </h1>
@@ -84,10 +100,10 @@ export function ResidentHome() {
                 <Card hover><EmptyState icon={Clock3} message="No pickups scheduled" /></Card>
               </section>
             )}
-            {tab === "History" && (
+            {tab === "Pickups" && (
               <section className="animate-fade-in-up">
-                <h2 className="mb-3 font-display text-xl font-semibold uppercase">Activity History</h2>
-                <Card><EmptyState icon={History} message="No activity yet" /></Card>
+                <h2 className="mb-3 font-display text-xl font-semibold uppercase">Past Pickups</h2>
+                <Card><EmptyState icon={History} message="No pickups yet" /></Card>
               </section>
             )}
           </div>
@@ -95,12 +111,12 @@ export function ResidentHome() {
 
         {tab === "Home" && (
           <div className="mt-9 border-t border-border pt-6 animate-fade-in stagger-3">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Red-E Now / Your residence, simplified</p>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground text-center">Red-E Now / Your residence, simplified</p>
           </div>
         )}
       </main>
 
-      <TabBar items={tabs} activeTab={tab} onTabChange={setTab} />
+      <TabBar items={tabs} activeTab={tab} onTabChange={setTab as (name: string) => void} />
     </div>
   );
 }

@@ -8,6 +8,7 @@ const KEY = "rede-now-mock-session";
 const ACCOUNTS_KEY = "rede-now-mock-accounts";
 const defaultAccounts: (User & { password: string })[] = [
   { name: "Maya Chen", email: "maya@test.com", password: "password123", role: "resident" },
+  { name: "Aayush", email: "aayush@test.com", password: "password123", role: "resident" },
   { name: "Alex Morgan", email: "admin@test.com", password: "password123", role: "staff" },
 ];
 function accounts() { try { return [...defaultAccounts, ...JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "[]") as (User & { password: string })[]]; } catch { return defaultAccounts; } }
