@@ -5,8 +5,6 @@ import { Avatar, Button, Card, EmptyState, TabBar } from "@/components/common";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { SparklesCore } from "@/components/ui/sparkles";
-import { ParticlesProvider } from "@tsparticles/react";
-import { loadSlim } from "@tsparticles/slim";
 
 const tabs = [{ name: "Home", icon: House }, { name: "Packages", icon: Package }, { name: "Schedule", icon: CalendarDays }, { name: "Pickups", icon: History }, { name: "Profile", icon: UserRound }] as const;
 
@@ -18,20 +16,18 @@ export function ResidentHome() {
   return (
     <div className="relative min-h-screen bg-background pb-20 transition-theme overflow-hidden">
       {isDark && (
-        <ParticlesProvider init={async (engine) => { await loadSlim(engine); }}>
-          <div className="pointer-events-none fixed inset-0 z-0">
-            <SparklesCore
-              id="dashboard-sparkles"
-              background="transparent"
-              minSize={0.4}
-              maxSize={1.2}
-              particleDensity={50}
-              className="h-full w-full"
-              particleColor="#E8344D"
-              speed={0.8}
-            />
-          </div>
-        </ParticlesProvider>
+        <div className="pointer-events-none fixed inset-0 z-0">
+          <SparklesCore
+            id="dashboard-sparkles"
+            background="transparent"
+            minSize={0.4}
+            maxSize={1.2}
+            particleDensity={50}
+            className="h-full w-full"
+            particleColor="#E8344D"
+            speed={0.8}
+          />
+        </div>
       )}
       <header className="relative z-10 border-b border-border bg-card transition-theme">
         <div className="mx-auto flex h-17 max-w-5xl items-center justify-center px-6 relative">

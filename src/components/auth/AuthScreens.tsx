@@ -5,8 +5,6 @@ import { Button, Card, LoadingSpinner, TextInput, Toast } from "@/components/com
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { SparklesCore } from "@/components/ui/sparkles";
-import { ParticlesProvider } from "@tsparticles/react";
-import { loadSlim } from "@tsparticles/slim";
 
 type Role = "resident" | "staff";
 
@@ -19,20 +17,18 @@ function AuthFrame({ title, subtitle, children, footer }: { title: string; subti
   return (
     <main className="relative min-h-screen bg-background px-6 py-8 sm:py-12 transition-theme overflow-hidden">
       {isDark && (
-        <ParticlesProvider init={async (engine) => { await loadSlim(engine); }}>
-          <div className="pointer-events-none absolute inset-0 z-0">
-            <SparklesCore
-              id="auth-sparkles"
-              background="transparent"
-              minSize={0.4}
-              maxSize={1.2}
-              particleDensity={60}
-              className="h-full w-full"
-              particleColor="#E8344D"
-              speed={0.8}
-            />
-          </div>
-        </ParticlesProvider>
+        <div className="pointer-events-none absolute inset-0 z-0">
+          <SparklesCore
+            id="auth-sparkles"
+            background="transparent"
+            minSize={0.4}
+            maxSize={1.2}
+            particleDensity={60}
+            className="h-full w-full"
+            particleColor="#E8344D"
+            speed={0.8}
+          />
+        </div>
       )}
       <div className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] max-w-[440px] flex-col">
         <div className="mb-10 text-center sm:mb-16 animate-fade-in">

@@ -8,10 +8,15 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { ParticlesProvider } from "@tsparticles/react";
+import { loadSlim } from "@tsparticles/slim";
+import type { Engine } from "@tsparticles/engine";
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/context/AuthContext";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+
+const particlesInit = async (engine: Engine) => { await loadSlim(engine); };
 
 function NotFoundComponent() {
   return (
@@ -114,9 +119,11 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
+    <ParticlesProvider init={particlesInit}>
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <AuthProvider><Outlet /></AuthProvider>
     </QueryClientProvider>
+    </ParticlesProvider>
   );
 }
