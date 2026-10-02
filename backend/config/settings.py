@@ -12,3 +12,9 @@ class Config:
     DEBUG = os.getenv("FLASK_DEBUG", "False").lower() == "true"
     HOST = os.getenv("HOST", "127.0.0.1")
     PORT = int(os.getenv("PORT", "5000"))
+
+    # This controls which frontend is allowed to call our API
+    FRONTEND_ORIGIN = os.getenv(
+        "FRONTEND_ORIGIN",
+        "http://localhost:5173"
+    )

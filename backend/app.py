@@ -1,28 +1,47 @@
 from flask import Flask
+from flask_cors import CORS
 
 from config.settings import Config
 from routes.health import health_bp
+from utils.error_handlers import register_error_handlers
 
 
 def create_app():
     # Create the main Flask application
     app = Flask(__name__)
 
-    # Load our application settings from the Config class
+    # Load our settings from the Config class
     app.config.from_object(Config)
 
-    # Register the health routes under the /api URL
-    app.register_blueprint(health_bp, url_prefix="/api")
+    # Allow the frontend application to communicate with our API
+    CORS(
+        app,
+        resources={
+            r"/api/*": {
+                "origins": app.config["FRONTEND_ORIGIN"]
+            }
+        }
+    )
 
+    # Register the health-check routes under /api
+    app.register_blueprint(
+        health_bp,
+        url_prefix="/api"
+    )
+
+    # Register our shared JSON error handlers
+    register_error_handlers(app)
+
+    # Return the finished Flask application
     return app
 
 
-# Create the app so Flask can run it
+# Create the application using our setup function
 app = create_app()
 
 
 if __name__ == "__main__":
-    # Use our environment settings when starting the development server
+    # Start the development server using our environment settings
     app.run(
         debug=app.config["DEBUG"],
         host=app.config["HOST"],
