@@ -1,8 +1,10 @@
 from flask import Flask
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager
 
 from config.settings import Config
 from routes.health import health_bp
+from routes.auth import auth_bp
 from utils.error_handlers import register_error_handlers
 
 
@@ -12,6 +14,9 @@ def create_app():
 
     # Load our settings from the Config class
     app.config.from_object(Config)
+
+    # Set up JWT authentication for protected API routes
+    JWTManager(app)
 
     # Allow the frontend application to communicate with our API
     CORS(
@@ -28,6 +33,12 @@ def create_app():
         health_bp,
         url_prefix="/api"
     )
+    # Register authentication routes under /api/auth
+    app.register_blueprint(
+        auth_bp,
+        url_prefix="/api/auth"
+    )
+
 
     # Register our shared JSON error handlers
     register_error_handlers(app)
