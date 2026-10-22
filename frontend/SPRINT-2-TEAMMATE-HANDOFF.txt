@@ -1,0 +1,205 @@
+RED-E NOW — SPRINT 2 TEAMMATE HANDOFF
+======================================
+Date: October 20, 2026
+From: Yo (UI/UX Engineer)
+
+What's done: The frontend is fully wired up with mock data.
+             Once the backend pieces below are in place, the
+             app connects automatically (just remove VITE_USE_MOCK=true
+             from the .env file).
+
+
+========================================
+ZAYED — Database Schema (schema.sql)
+========================================
+
+The current schema.sql on the main branch is the old e-commerce
+schema (users/orders/products). It needs to be replaced with the
+Red-E Now schema. Here's what the frontend expects:
+
+TABLE: residents
+  - id              INT PRIMARY KEY AUTO_INCREMENT
+  - name            VARCHAR(100) NOT NULL
+  - email           VARCHAR(150) UNIQUE NOT NULL
+  - password_hash   VARCHAR(255) NOT NULL
+  - unit            VARCHAR(20)              -- e.g. "4B", "7A"
+  - role            ENUM('resident','staff') DEFAULT 'resident'
+  - created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+TABLE: packages
+  - id              INT PRIMARY KEY AUTO_INCREMENT
+  - carrier_name    VARCHAR(50) NOT NULL     -- "FedEx", "UPS", "USPS", "Amazon", "DHL", "Other"
+  - tracking_code   VARCHAR(100) NOT NULL
+  - status          ENUM('received','available','scheduled','prepared','picked_up')
+                    DEFAULT 'received'
+  - description     VARCHAR(255)             -- "Small box", "Large envelope", etc.
+  - arrived_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  - resident_id     INT NOT NULL             -- FK → residents.id
+  - registered_by   INT NOT NULL             -- FK → residents.id (the staff member)
+  - updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+
+  FOREIGN KEY (resident_id)  REFERENCES residents(id)
+  FOREIGN KEY (registered_by) REFERENCES residents(id)
+
+SEED DATA (for testing):
+  INSERT INTO residents (name, email, password_hash, unit, role) VALUES
+    ('Maya Chen',  'resident@example.com', <bcrypt hash of 'password123'>, '4B', 'resident'),
+    ('Alex Morgan','staff@example.com',    <bcrypt hash of 'password123'>, NULL, 'staff'),
+    ('Jordan Lee', 'jordan@example.com',   <bcrypt hash of 'password123'>, '7A', 'resident'),
+    ('Sam Rivera', 'sam@example.com',      <bcrypt hash of 'password123'>, '2C', 'resident');
+
+NOTE: The "pickup_slots" and "appointments" tables are Sprint 3.
+      For now we only need residents + packages.
+
+
+========================================
+REHMAN — Backend Endpoints (Flask)
+========================================
+
+All endpoints return JSON in this format:
+  Success: { "success": true, ... }
+  Error:   { "success": false, "error": { "code": "SOME_CODE", "message": "Human-readable" } }
+
+The JWT token is sent as: Authorization: Bearer <token>
+Use flask-jwt-extended (already in requirements.txt).
+
+--- 1. POST /api/packages (staff only) ---
+  Purpose: Register a new package that arrived at the building.
+  Auth: JWT required, role must be "staff"
+  Request body:
+    {
+      "carrier_name": "FedEx",
+      "tracking_code": "1Z999AA10123456784",
+      "resident_id": 1,
+      "description": "Small box"        // optional
+    }
+  Response (201):
+    {
+      "success": true,
+      "package": {
+        "id": 5,
+        "carrier_name": "FedEx",
+        "tracking_code": "1Z999AA10123456784",
+        "status": "received",
+        "description": "Small box",
+        "arrived_at": "2026-10-20T14:30:00Z",
+        "resident_id": 1,
+        "resident_name": "Maya Chen",    // JOIN from residents table
+        "resident_unit": "4B",           // JOIN from residents table
+        "registered_by": 2
+      }
+    }
+  Errors:
+    - 400 MISSING_FIELD if carrier_name, tracking_code, or resident_id missing
+    - 404 RESIDENT_NOT_FOUND if resident_id doesn't exist
+    - 403 FORBIDDEN if user is not staff
+
+--- 2. GET /api/packages (staff only) ---
+  Purpose: List all packages, with optional filters.
+  Auth: JWT required, role must be "staff"
+  Query params (all optional):
+    ?status=received        Filter by status
+    ?search=maya            Search across resident_name, tracking_code, carrier_name
+  Response (200):
+    {
+      "success": true,
+      "packages": [ ...array of package objects same shape as above... ]
+    }
+  Notes:
+    - Order by arrived_at DESC (newest first)
+    - The search should be case-insensitive LIKE match
+    - Each package object must include resident_name and resident_unit (JOIN)
+
+--- 3. GET /api/packages/:id (staff only) ---
+  Purpose: Get a single package by ID.
+  Auth: JWT required, role must be "staff"
+  Response (200):
+    {
+      "success": true,
+      "package": { ...single package object... }
+    }
+  Errors:
+    - 404 NOT_FOUND if package doesn't exist
+
+--- 4. PUT /api/packages/:id (staff only) ---
+  Purpose: Update a package (mainly to advance its status).
+  Auth: JWT required, role must be "staff"
+  Request body (all fields optional):
+    {
+      "status": "available",
+      "carrier_name": "UPS",
+      "tracking_code": "new-code",
+      "description": "Updated description"
+    }
+  Response (200):
+    {
+      "success": true,
+      "package": { ...updated package object... }
+    }
+  Errors:
+    - 404 NOT_FOUND if package doesn't exist
+  Notes:
+    - Only update the fields that are present in the request body
+    - Valid status transitions:
+        received  → available
+        available → available (no-op, but allowed)
+        scheduled → prepared
+        prepared  → picked_up
+
+--- 5. GET /api/my-packages (resident only) ---
+  Purpose: Get the logged-in resident's own packages.
+  Auth: JWT required, role must be "resident"
+  Response (200):
+    {
+      "success": true,
+      "packages": [ ...array of package objects for this resident only... ]
+    }
+  Notes:
+    - Filter by resident_id = current user's ID (from JWT)
+    - Order by arrived_at DESC
+    - Same package object shape as the staff endpoints
+
+
+========================================
+HOW TO TEST
+========================================
+
+1. Start the backend:  cd backend && python app.py
+   (runs on port 5000)
+
+2. Start the frontend: cd frontend && npm run dev
+   (runs on port 8080)
+
+3. To use MOCK DATA (no backend needed):
+   Create/edit .env in the frontend root:
+     VITE_USE_MOCK=true
+
+4. To use REAL BACKEND:
+   Remove VITE_USE_MOCK from .env (or set to false)
+   Make sure VITE_API_BASE_URL=http://localhost:5000/api
+
+5. Test logins:
+   Resident: resident@example.com / password123
+   Staff:    staff@example.com    / password123
+
+
+========================================
+FILES I CHANGED / ADDED
+========================================
+
+NEW:  src/api/packagesApi.ts
+        → API wrapper with mock fallback for all 5 endpoints
+
+UPDATED: src/components/dashboard/StaffDashboard.tsx
+        → Register Package form (carrier, tracking, resident, description)
+        → Packages section with Table, search, filter, Drawer detail
+        → Dashboard stats now show live counts
+        → Recent Activity shows latest packages
+
+UPDATED: src/components/resident/ResidentHome.tsx
+        → Home tab shows package count + PackageCard list
+        → Packages tab shows full list via PackageCard
+        → Pickups tab shows completed packages
+
+NO OTHER FILES CHANGED. All existing components, routes, auth,
+and styling are untouched.

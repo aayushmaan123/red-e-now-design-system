@@ -1,0 +1,234 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Red-E Now Design System
+ *
+ * Light + Dark themes with brand-aligned colors.
+ * Animation keyframes at the bottom.
+ * Respects prefers-reduced-motion.
+ */
+
+/* ── Tailwind theme mappings ── */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --font-display: "Barlow Condensed", sans-serif;
+  --font-sans: "Jost", sans-serif;
+  --font-mono: "DM Mono", monospace;
+  --color-success: var(--success);
+  --color-info: var(--info);
+  --color-prepared: var(--prepared);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-overlay: var(--overlay);
+  --shadow-card: 0 1px 3px var(--shadow-tone);
+}
+
+/* ── Light theme (default) ── */
+:root {
+  --radius: 0.75rem;
+  --background: #f7f7f4;
+  --foreground: #1a1a1a;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1a;
+  --primary: #c8102e;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f3f0;
+  --secondary-foreground: #1a1a1a;
+  --muted: #f3f3f0;
+  --muted-foreground: #6b7280;
+  --accent: #f3f3f0;
+  --accent-foreground: #1a1a1a;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #c8102e;
+  --success: #16a34a;
+  --info: #2563eb;
+  --prepared: #c45d1a;
+  --warning: #f59e0b;
+  --warning-foreground: #a16207;
+  --overlay: rgb(26 26 26 / 45%);
+  --shadow-tone: rgb(0 0 0 / 8%);
+  --sidebar: #fafaf8;
+  --sidebar-foreground: #1a1a1a;
+  --sidebar-primary: #c8102e;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f3f3f0;
+  --sidebar-accent-foreground: #1a1a1a;
+  --sidebar-border: #e5e5e5;
+  --sidebar-ring: #c8102e;
+}
+
+/* ── Dark theme ── */
+.dark {
+  --background: #121214;
+  --foreground: #f0f0ec;
+  --card: #1c1c1f;
+  --card-foreground: #f0f0ec;
+  --popover: #1c1c1f;
+  --popover-foreground: #f0f0ec;
+  --primary: #e8344d;
+  --primary-foreground: #ffffff;
+  --secondary: #242428;
+  --secondary-foreground: #e0e0dc;
+  --muted: #242428;
+  --muted-foreground: #8b8b95;
+  --accent: #2a2a2e;
+  --accent-foreground: #f0f0ec;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #2e2e33;
+  --input: #2e2e33;
+  --ring: #e8344d;
+  --success: #22c55e;
+  --info: #3b82f6;
+  --prepared: #e07a3a;
+  --warning: #eab308;
+  --warning-foreground: #d4a017;
+  --overlay: rgb(0 0 0 / 60%);
+  --shadow-tone: rgb(0 0 0 / 30%);
+  --sidebar: #18181b;
+  --sidebar-foreground: #f0f0ec;
+  --sidebar-primary: #e8344d;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #242428;
+  --sidebar-accent-foreground: #f0f0ec;
+  --sidebar-border: #2e2e33;
+  --sidebar-ring: #e8344d;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    font-family: "Jost", sans-serif;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+/* ── Animation keyframes ── */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes float-up {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ── Utility animation classes ── */
+.animate-fade-in        { animation: fade-in 0.4s ease-out both; }
+.animate-fade-in-up     { animation: fade-in-up 0.5s ease-out both; }
+.animate-fade-in-down   { animation: fade-in-down 0.4s ease-out both; }
+.animate-slide-in-left  { animation: slide-in-left 0.4s ease-out both; }
+.animate-slide-in-right { animation: slide-in-right 0.4s ease-out both; }
+.animate-scale-in       { animation: scale-in 0.35s ease-out both; }
+.animate-float-up       { animation: float-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-shimmer        { animation: shimmer 2s linear infinite; background-size: 200% 100%; }
+.animate-pulse-soft     { animation: pulse-soft 2s ease-in-out infinite; }
+
+/* Drawer slide-in animations */
+@keyframes slide-in-from-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes slide-in-from-bottom {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.animate-slide-in-from-right  { animation: slide-in-from-right 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-slide-in-from-bottom { animation: slide-in-from-bottom 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Stagger delays for lists/grids */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+/* ── Transition utilities ── */
+.transition-theme {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
