@@ -1,54 +1,29 @@
+USE rede_now;
+
 DROP TABLE IF EXISTS packages;
-DROP TABLE IF EXISTS staff;
-DROP TABLE IF EXISTS residents;
-DROP TABLE IF EXISTS units;
-DROP TABLE IF EXISTS buildings;
 DROP TABLE IF EXISTS users;
 
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    email VARCHAR(191) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     role ENUM('resident', 'staff') NOT NULL,
+    unit VARCHAR(20) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE buildings (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    address VARCHAR(255) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE units (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    building_id INT NOT NULL,
-    unit_number VARCHAR(20) NOT NULL,
-    FOREIGN KEY (building_id) REFERENCES buildings(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE residents (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL UNIQUE,
-    unit_id INT NOT NULL,
-    phone VARCHAR(20),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE staff (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL UNIQUE,
-    employee_code VARCHAR(50) UNIQUE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE packages (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    tracking_number VARCHAR(100) NOT NULL,
+    carrier_name VARCHAR(50) NOT NULL,
+    tracking_code VARCHAR(100) NOT NULL,
     resident_id INT NOT NULL,
-    carrier VARCHAR(50),
-    status ENUM('Received', 'Scheduled', 'Prepared', 'Picked Up') DEFAULT 'Received',
+    description TEXT DEFAULT NULL,
+    status ENUM('received', 'available', 'scheduled', 'prepared', 'picked_up') NOT NULL DEFAULT 'received',
+    arrived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    registered_by INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE CASCADE
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (resident_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (registered_by) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
