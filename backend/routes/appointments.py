@@ -141,9 +141,11 @@ def create_appointment():
         package = cursor.fetchone()
 
         if package is None or package["resident_id"] != resident_id:
+            connection.rollback()
             return fail("NOT_FOUND", "Package not found.", 404)
 
         if package["status"] != "available":
+            connection.rollback()
             return fail(
                 "CONFLICT",
                 "Only available packages can be scheduled.",
@@ -157,6 +159,7 @@ def create_appointment():
         """, (package_id,))
 
         if cursor.fetchone():
+            connection.rollback()
             return fail("CONFLICT", "Package already scheduled.", 409)
 
         # Lock the shared time slot to serialize bookings across packages.
@@ -261,6 +264,7 @@ def cancel_appointment(appointment_id):
         existing = cursor.fetchone()
 
         if existing is None:
+            connection.rollback()
             return fail("NOT_FOUND", "Appointment not found.", 404)
 
         # Lock package first, matching the booking lock order.
@@ -277,9 +281,11 @@ def cancel_appointment(appointment_id):
         appointment = cursor.fetchone()
 
         if appointment["status"] != "scheduled":
+            connection.rollback()
             return fail("CONFLICT", "Appointment is not active.", 409)
 
         if package["status"] != "scheduled":
+            connection.rollback()
             return fail(
                 "CONFLICT",
                 "This package can no longer be rescheduled.",

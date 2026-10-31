@@ -469,6 +469,44 @@ def update_package(package_id):
                     409,
                 )
 
+        # Sprint 3: scheduling must happen through the appointment API.
+        if (
+            updates.get("status") == "scheduled"
+            and existing["status"] != "scheduled"
+        ):
+            connection.rollback()
+            return error_response(
+                "APPOINTMENT_REQUIRED",
+                "Schedule pickups through the resident appointment system.",
+                409,
+            )
+
+        # Staff may prepare or complete only packages with a real
+        # active appointment. This prevents orphaned status changes.
+        if (
+            updates.get("status") in ("prepared", "picked_up")
+            and updates["status"] != existing["status"]
+        ):
+            cursor.execute(
+                """
+                SELECT id
+                FROM pickup_appointments
+                WHERE package_id = %s
+                  AND status = 'scheduled'
+                LIMIT 1
+                FOR UPDATE
+                """,
+                (package_id,),
+            )
+
+            if cursor.fetchone() is None:
+                connection.rollback()
+                return error_response(
+                    "APPOINTMENT_REQUIRED",
+                    "An active pickup appointment is required.",
+                    409,
+                )
+
         if "tracking_code" in updates:
             cursor.execute(
                 """
