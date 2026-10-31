@@ -22,9 +22,13 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import {
-  getPackages, registerPackage, updatePackage,
+  getPackages, registerPackage, updatePackage, getPackageAudit,
+  type PackageAuditEntry,
   type PackageRecord, type PackageStatus,
 } from "@/api/packagesApi";
+
+import { getResidents, type ResidentOption } from "@/api/residentsApi";
+import { getAppointments, type PickupAppointment } from "@/api/appointmentsApi";
 
 /* ── Sidebar nav items ── */
 const items = [
@@ -72,6 +76,8 @@ const pkgColumns: Column<PackageRecord>[] = [
   { key: "tracking_code", header: "Tracking", width: "180px", render: (r) => (
     <span className="font-mono text-xs">{r.tracking_code.length > 14 ? r.tracking_code.slice(0, 14) + "…" : r.tracking_code}</span>
   )},
+  { key: "location_code", header: "Location", sortable: true,
+    render: (r) => r.location_code || "Not assigned" },
   { key: "status", header: "Status", sortable: true, width: "120px", render: (r) => (
     <StatusBadge status={r.status} />
   )},
@@ -81,7 +87,6 @@ const pkgColumns: Column<PackageRecord>[] = [
 /* ── Next status transitions ── */
 const NEXT_STATUS: Partial<Record<PackageStatus, { label: string; next: PackageStatus }>> = {
   received: { label: "Mark Available", next: "available" },
-  available: { label: "Mark Available", next: "available" },
   scheduled: { label: "Mark Prepared", next: "prepared" },
   prepared: { label: "Confirm Pickup", next: "picked_up" },
 };
@@ -105,22 +110,74 @@ export function StaffDashboard() {
   /* ── Drawer state (package detail) ── */
   const [drawerPkg, setDrawerPkg] = useState<PackageRecord | null>(null);
 
+  // Each change shows who made it and when.
+  const [audit, setAudit] = useState<PackageAuditEntry[]>([]);
+  const [auditError, setAuditError] = useState("");
+
+  // Staff can edit package details without changing its status.
+  const [editMode, setEditMode] = useState(false);
+  const [editCarrier, setEditCarrier] = useState("");
+  const [editTracking, setEditTracking] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editSuccess, setEditSuccess] = useState("");
+
   /* ── Register form state ── */
   const [regCarrier, setRegCarrier] = useState<string>("FedEx");
   const [regTracking, setRegTracking] = useState("");
-  const [regResidentId, setRegResidentId] = useState("1");
+  // The dropdown starts empty until real residents are loaded.
+  const [residents, setResidents] = useState<ResidentOption[]>([]);
+  const [residentsError, setResidentsError] = useState("");
+  const [regResidentId, setRegResidentId] = useState("");
+  const [regLocation, setRegLocation] = useState("");
   const [regDescription, setRegDescription] = useState("");
   const [regLoading, setRegLoading] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
   const [regError, setRegError] = useState("");
+
+
+  /* Sprint 3 — staff pickup appointments */
+  const [appointments, setAppointments] = useState<PickupAppointment[]>([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState("");
+
+  const fetchAppointments = useCallback(async () => {
+    setAppointmentsLoading(true);
+    setAppointmentsError("");
+    try {
+      setAppointments(await getAppointments());
+    } catch (error) {
+      setAppointmentsError(
+        error instanceof Error ? error.message : "Could not load appointments."
+      );
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments, section]);
+
+  const todayKey = new Date().toLocaleDateString("en-CA");
+
+  const activeAppointments = appointments.filter(
+    (appointment) => appointment.status === "scheduled"
+  );
+
+  const todaysAppointments = activeAppointments.filter(
+    (appointment) => appointment.pickup_start.slice(0, 10) === todayKey
+  );
 
   /* ── Fetch packages ── */
   const fetchPackages = useCallback(async () => {
     setLoading(true);
     try {
       const list = await getPackages({
-        status: statusFilter || undefined,
-        search: searchQ || undefined,
+        ...(statusFilter ? { status: statusFilter } : {}),
+        ...(searchQ.trim() ? { search: searchQ.trim() } : {}),
       });
       setPackages(list);
     } catch {
@@ -134,11 +191,56 @@ export function StaffDashboard() {
     fetchPackages();
   }, [fetchPackages]);
 
+  useEffect(() => {
+    // Staff can only register packages for real resident accounts.
+    getResidents()
+      .then((list) => {
+        setResidents(list);
+        setRegResidentId((current) => current || String(list[0]?.id ?? ""));
+      })
+      .catch((err: unknown) => {
+        setResidentsError(
+          err instanceof Error ? err.message : "Could not load residents"
+        );
+      });
+  }, []);
+
+  useEffect(() => {
+    setEditMode(false);
+    setEditError("");
+    setEditSuccess("");
+
+    if (drawerPkg) {
+      setEditCarrier(drawerPkg.carrier_name);
+      setEditTracking(drawerPkg.tracking_code);
+      setEditDescription(drawerPkg.description || "");
+      setEditLocation(drawerPkg.location_code || "");
+    }
+  }, [drawerPkg?.id]);
+
+  useEffect(() => {
+    if (!drawerPkg) {
+      setAudit([]);
+      setAuditError("");
+      return;
+    }
+
+    // Reload history whenever the selected package changes.
+    getPackageAudit(drawerPkg.id)
+      .then(setAudit)
+      .catch((err: unknown) => {
+        setAuditError(
+          err instanceof Error ? err.message : "Could not load audit history"
+        );
+      });
+  }, [drawerPkg]);
+
   /* ── Sorted packages ── */
   const sortedPackages = [...packages].sort((a, b) => {
     if (!sortKey) return 0;
-    const aVal = String((a as Record<string, unknown>)[sortKey] ?? "");
-    const bVal = String((b as Record<string, unknown>)[sortKey] ?? "");
+    const key = sortKey as keyof PackageRecord;
+    const aVal = String(a[key] ?? "");
+    const bVal = String(b[key] ?? "");
     const cmp = aVal.localeCompare(bVal);
     return sortDir === "asc" ? cmp : -cmp;
   });
@@ -159,18 +261,35 @@ export function StaffDashboard() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError("");
-    if (!regTracking.trim()) { setRegError("Tracking code is required"); return; }
+    if (!regTracking.trim()) {
+      setRegError("Tracking code is required");
+      return;
+    }
+    if (!regResidentId || !residents.some(
+      (resident) => resident.id === Number(regResidentId)
+    )) {
+      setRegError("Please choose a valid resident");
+      return;
+    }
+    if (!regLocation.trim()) {
+      setRegError("Storage location is required");
+      return;
+    }
     setRegLoading(true);
     try {
       await registerPackage({
         carrier_name: regCarrier,
         tracking_code: regTracking.trim(),
         resident_id: Number(regResidentId),
-        description: regDescription.trim() || undefined,
+        location_code: regLocation.trim(),
+        ...(regDescription.trim()
+          ? { description: regDescription.trim() }
+          : {}),
       });
       setRegSuccess(true);
       setRegTracking("");
       setRegDescription("");
+      setRegLocation("");
       fetchPackages(); // refresh the list
       setTimeout(() => setRegSuccess(false), 3000);
     } catch (err) {
@@ -189,6 +308,41 @@ export function StaffDashboard() {
       fetchPackages();
     } catch {
       // silent — real app would show toast
+    }
+  };
+
+  const handleEditSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!drawerPkg || editSaving) return;
+
+    setEditError("");
+    setEditSuccess("");
+
+    if (!editCarrier.trim() || !editTracking.trim() || !editLocation.trim()) {
+      setEditError("Carrier, tracking code, and storage location are required.");
+      return;
+    }
+
+    setEditSaving(true);
+    try {
+      const updated = await updatePackage(drawerPkg.id, {
+        carrier_name: editCarrier.trim(),
+        tracking_code: editTracking.trim(),
+        description: editDescription.trim(),
+        location_code: editLocation.trim(),
+      });
+
+      // Refresh the drawer and table after MySQL accepts the changes.
+      setDrawerPkg(updated);
+      setEditMode(false);
+      setEditSuccess("Package details saved successfully.");
+      await fetchPackages();
+    } catch (err) {
+      setEditError(
+        err instanceof Error ? err.message : "Could not update package."
+      );
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -300,7 +454,9 @@ export function StaffDashboard() {
                     <s.icon size={18} strokeWidth={1.8} />
                   </div>
                   <div className="font-display text-[35px] font-semibold leading-none">
-                    {packages.filter(s.filter).length}
+                    {s.label === "Today's Pickups"
+                      ? todaysAppointments.length
+                      : packages.filter(s.filter).length}
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground sm:text-sm">{s.label}</p>
                 </Card>
@@ -380,31 +536,47 @@ export function StaffDashboard() {
                 <TextInput
                   label="Tracking Code"
                   value={regTracking}
-                  onChange={setRegTracking}
+                  onChange={(e) => setRegTracking(e.target.value)}
                   placeholder="e.g. 1Z999AA10123456784"
                   required
                 />
 
-                {/* Resident (simplified — ID input for MVP; will be search dropdown later) */}
+                {/* These names and units come from the backend. */}
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium">Resident ID <span className="text-primary">*</span></label>
+                  <label className="mb-1.5 block text-sm font-medium">Resident <span className="text-primary">*</span></label>
                   <select
                     value={regResidentId}
                     onChange={(e) => setRegResidentId(e.target.value)}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   >
-                    <option value="1">Maya Chen — Unit 4B</option>
-                    <option value="3">Jordan Lee — Unit 7A</option>
-                    <option value="4">Sam Rivera — Unit 2C</option>
+                    <option value="">Choose a resident</option>
+                    {residents.map((resident) => (
+                      <option key={resident.id} value={resident.id}>
+                        {resident.name} — Unit {resident.unit || "Not assigned"}
+                      </option>
+                    ))}
                   </select>
-                  <p className="mt-1 text-xs text-muted-foreground">Resident search will replace this dropdown once the residents endpoint is ready.</p>
+                  {residentsError && (
+                    <p className="mt-1 text-xs text-destructive">
+                      {residentsError}
+                    </p>
+                  )}
                 </div>
+
+                {/* Staff need to know exactly where the package is stored. */}
+                <TextInput
+                  label="Storage Location"
+                  value={regLocation}
+                  onChange={(e) => setRegLocation(e.target.value)}
+                  placeholder="e.g. SHELF-A1"
+                  required
+                />
 
                 {/* Description */}
                 <TextInput
                   label="Description"
                   value={regDescription}
-                  onChange={setRegDescription}
+                  onChange={(e) => setRegDescription(e.target.value)}
                   placeholder="e.g. Small box, Large envelope"
                 />
 
@@ -437,7 +609,7 @@ export function StaffDashboard() {
                 <SearchField
                   value={searchQ}
                   onChange={setSearchQ}
-                  placeholder="Search by name, tracking, carrier…"
+                  placeholder="Search name, tracking, carrier, location…"
                   debounceMs={300}
                 />
               </div>
@@ -456,13 +628,82 @@ export function StaffDashboard() {
                 columns={pkgColumns}
                 data={sortedPackages}
                 keyExtractor={(r) => String(r.id)}
-                sortKey={sortKey}
+                {...(sortKey ? { sortKey } : {})}
                 sortDir={sortDir}
                 onSort={handleSort}
                 onRowClick={(r) => setDrawerPkg(r)}
                 emptyMessage={loading ? "Loading packages…" : "No packages found"}
               />
             </div>
+          </>
+
+
+        /* ═══════ SPRINT 3 PICKUP SCHEDULE ═══════ */
+        ) : section === "Today's Pickups" || section === "Upcoming" ? (
+          <>
+            <div className="mb-7 animate-fade-in-up">
+              <h1 className="font-display text-[38px] font-semibold uppercase">
+                {section}
+              </h1>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Live pickup appointments from MySQL.
+              </p>
+            </div>
+
+            <Button
+              variant="secondary"
+              onClick={fetchAppointments}
+              disabled={appointmentsLoading}
+              className="mb-5"
+            >
+              {appointmentsLoading ? "Refreshing..." : "Refresh Appointments"}
+            </Button>
+
+            {appointmentsError && (
+              <p role="alert" className="mb-4 text-sm text-destructive">
+                {appointmentsError}
+              </p>
+            )}
+
+            <div className="space-y-3">
+              {(section === "Today's Pickups"
+                ? todaysAppointments
+                : activeAppointments.filter(
+                    (a) => a.pickup_start.slice(0, 10) >= todayKey
+                  )
+              ).map((appointment) => (
+                <Card key={appointment.id} className="p-5">
+                  <p className="text-lg font-semibold">
+                    {appointment.resident_name}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Unit {appointment.resident_unit || "Not assigned"}
+                  </p>
+                  <p className="mt-3 text-sm">
+                    {appointment.carrier_name} — {appointment.tracking_code}
+                  </p>
+                  <p className="mt-2 text-sm font-medium">
+                    {new Date(appointment.pickup_start).toLocaleString()}
+                  </p>
+                  <p className="mt-2 text-xs text-primary">Scheduled</p>
+                </Card>
+              ))}
+            </div>
+
+            {!appointmentsLoading &&
+              (section === "Today's Pickups"
+                ? todaysAppointments
+                : activeAppointments.filter(
+                    (a) => a.pickup_start.slice(0, 10) >= todayKey
+                  )
+              ).length === 0 && !appointmentsError && (
+                <Card className="p-6">
+                  <EmptyState
+                    icon={CalendarDays}
+                    message="No scheduled pickups for this period"
+                  />
+                </Card>
+              )}
           </>
 
         /* ═══════ ACCOUNT ═══════ */
@@ -548,10 +789,136 @@ export function StaffDashboard() {
               )}
             </div>
 
+            {/* Staff can find the physical package using this code. */}
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Storage Location
+              </p>
+              <p className="mt-1 text-sm">
+                {drawerPkg.location_code || "Not assigned"}
+              </p>
+            </div>
+
             {/* Arrival date */}
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Arrived</p>
               <p className="mt-1 text-sm">{drawerPkg.arrived_at}</p>
+            </div>
+
+            {/* Staff can update package details from this drawer. */}
+            <div className="border-t border-border pt-5">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold">Package Details</h3>
+                {!editMode && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setEditCarrier(drawerPkg.carrier_name);
+                      setEditTracking(drawerPkg.tracking_code);
+                      setEditDescription(drawerPkg.description || "");
+                      setEditLocation(drawerPkg.location_code || "");
+                      setEditError("");
+                      setEditSuccess("");
+                      setEditMode(true);
+                    }}
+                  >
+                    Edit Package
+                  </Button>
+                )}
+              </div>
+
+              {editSuccess && (
+                <p className="mt-3 text-sm text-success">{editSuccess}</p>
+              )}
+
+              {editMode && (
+                <form onSubmit={handleEditSave} className="mt-4 space-y-4">
+                  <TextInput
+                    label="Carrier"
+                    value={editCarrier}
+                    onChange={(e) => setEditCarrier(e.target.value)}
+                    required
+                  />
+                  <TextInput
+                    label="Tracking Code"
+                    value={editTracking}
+                    onChange={(e) => setEditTracking(e.target.value)}
+                    required
+                  />
+                  <TextInput
+                    label="Description"
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                  />
+                  <TextInput
+                    label="Storage Location"
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                    required
+                  />
+
+                  {editError && (
+                    <p className="text-sm text-destructive">{editError}</p>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="submit" disabled={editSaving}>
+                      {editSaving ? "Saving…" : "Save Changes"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={editSaving}
+                      onClick={() => {
+                        setEditMode(false);
+                        setEditError("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* The backend records edits and status changes. */}
+            <div className="border-t border-border pt-5">
+              <h3 className="mb-3 text-sm font-semibold">Audit History</h3>
+              {auditError && (
+                <p className="text-sm text-destructive">{auditError}</p>
+              )}
+              {!auditError && audit.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  No changes recorded yet.
+                </p>
+              )}
+              <div className="space-y-3">
+                {audit.map((entry) => (
+                  <div key={entry.id} className="rounded-lg border border-border p-3">
+                    <p className="text-sm font-medium">
+                      {entry.action.replaceAll("_", " ")}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {entry.changed_by_name || `Staff #${entry.changed_by}`}
+                      {" · "}
+                      {new Date(entry.changed_at).toLocaleString()}
+                    </p>
+                    {entry.new_values && (
+                      <div className="mt-2 space-y-1">
+                        {Object.entries(entry.new_values).map(([field, value]) => (
+                          <p key={field} className="break-words text-xs">
+                            <span className="font-medium">
+                              {field.replaceAll("_", " ")}:
+                            </span>{" "}
+                            {String(value ?? "Not set")}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Status advance button */}

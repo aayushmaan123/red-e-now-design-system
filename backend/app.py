@@ -6,27 +6,36 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 
+# Bring in all the routes our backend uses.
 from routes.auth import auth_bp
 from routes.packages import packages_bp
+from routes.residents import residents_bp
+from routes.appointments import appointments_bp
 
 
-# Load environment variables from the backend .env file.
+# Grab our local settings from the .env file.
+# This keeps passwords and secret keys out of the code.
 load_dotenv()
 
 
 def create_app():
+    # This is where our Flask application gets set up.
     app = Flask(__name__)
 
-    # JWT settings for resident and staff login.
+    # JWT is what keeps users logged in when they make API requests.
+    # We need a secret key so nobody can fake a login token.
     app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 
     if not app.config["JWT_SECRET_KEY"]:
-        raise RuntimeError("JWT_SECRET_KEY is missing from the .env file.")
+        raise RuntimeError(
+            "JWT_SECRET_KEY is missing from the .env file."
+        )
 
-    # Allow requests from the frontend.
+    # Allow our React frontend to communicate with Flask.
+    # Our current Vite frontend runs on port 8080.
     frontend_origin = os.getenv(
         "FRONTEND_ORIGIN",
-        "http://localhost:3000"
+        "http://localhost:8080"
     )
 
     CORS(
@@ -39,14 +48,18 @@ def create_app():
         allow_headers=["Content-Type", "Authorization"]
     )
 
-    # Enable JWT authentication.
+    # Turn on JWT authentication for protected routes.
     jwt = JWTManager(app)
 
-    # Register our API routes.
+    # Connect all our API routes to the Flask application.
+    # Auth handles login, packages handles package management,
+    # and residents lets staff find real residents from MySQL.
     app.register_blueprint(auth_bp)
     app.register_blueprint(packages_bp)
+    app.register_blueprint(residents_bp)
+    app.register_blueprint(appointments_bp)
 
-    # Check whether the backend is running.
+    # A quick way to check that the backend is running.
     @app.route("/api/health", methods=["GET"])
     def health():
         return jsonify({
@@ -54,7 +67,7 @@ def create_app():
             "message": "RED-E-NOW backend is running."
         }), 200
 
-    # Return JSON when a route does not exist.
+    # Give the frontend a clean JSON response for missing pages.
     @app.errorhandler(404)
     def not_found(error):
         return jsonify({
@@ -65,7 +78,8 @@ def create_app():
             }
         }), 404
 
-    # Return JSON when an HTTP method is not allowed.
+    # This happens when someone uses the wrong request method.
+    # For example, sending GET to an endpoint that only accepts POST.
     @app.errorhandler(405)
     def method_not_allowed(error):
         return jsonify({
@@ -76,10 +90,12 @@ def create_app():
             }
         }), 405
 
-    # Return JSON for unexpected server errors.
+    # Catch unexpected backend errors without exposing private details.
     @app.errorhandler(500)
     def internal_server_error(error):
-        app.logger.exception("An internal server error occurred.")
+        app.logger.exception(
+            "An internal server error occurred."
+        )
 
         return jsonify({
             "success": False,
@@ -89,7 +105,7 @@ def create_app():
             }
         }), 500
 
-    # Return JSON when the JWT is missing.
+    # If someone forgets to send a JWT, return a helpful error.
     @jwt.unauthorized_loader
     def missing_token(message):
         return jsonify({
@@ -100,7 +116,7 @@ def create_app():
             }
         }), 401
 
-    # Return JSON when the JWT is invalid.
+    # Reject tokens that aren't valid.
     @jwt.invalid_token_loader
     def invalid_token(message):
         return jsonify({
@@ -111,7 +127,7 @@ def create_app():
             }
         }), 422
 
-    # Return JSON when the JWT has expired.
+    # Ask users to log in again when their JWT expires.
     @jwt.expired_token_loader
     def expired_token(jwt_header, jwt_payload):
         return jsonify({
@@ -125,10 +141,12 @@ def create_app():
     return app
 
 
+# Build the app so Flask can start serving requests.
 app = create_app()
 
 
 if __name__ == "__main__":
+    # These settings control how Flask runs on our Ubuntu VM.
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "5000"))
     debug = os.getenv("FLASK_DEBUG", "False").lower() == "true"

@@ -1,7 +1,8 @@
 
+import json
 from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 from mysql.connector import Error, IntegrityError
 
@@ -35,6 +36,7 @@ PACKAGE_SELECT = """
         r.name AS resident_name,
         r.unit AS resident_unit,
         p.description,
+        p.location_code,
         p.status,
         p.arrived_at,
         p.registered_by
@@ -46,10 +48,7 @@ PACKAGE_SELECT = """
 def error_response(code, message, status):
     return jsonify({
         "success": False,
-        "error": {
-            "code": code,
-            "message": message,
-        },
+        "error": {"code": code, "message": message},
     }), status
 
 
@@ -66,13 +65,12 @@ def serialize_package(package):
         return None
 
     result = dict(package)
-
     arrived_at = result.get("arrived_at")
+
     if isinstance(arrived_at, datetime):
-        # MySQL TIMESTAMP values are returned as naive UTC datetimes.
-        result["arrived_at"] = (
-            arrived_at.replace(tzinfo=timezone.utc).isoformat()
-        )
+        result["arrived_at"] = arrived_at.replace(
+            tzinfo=timezone.utc
+        ).isoformat()
 
     if result.get("description") is None:
         result["description"] = ""
@@ -107,6 +105,23 @@ def database_error(error):
     )
 
 
+def add_audit(cursor, package_id, actor_id, action, old, new):
+    cursor.execute(
+        """
+        INSERT INTO package_audit_log
+            (package_id, changed_by, action, old_values, new_values)
+        VALUES (%s, %s, %s, %s, %s)
+        """,
+        (
+            package_id,
+            actor_id,
+            action,
+            json.dumps(old) if old is not None else None,
+            json.dumps(new) if new is not None else None,
+        ),
+    )
+
+
 @packages_bp.route("/api/packages", methods=["POST"])
 @jwt_required()
 def create_package():
@@ -119,35 +134,28 @@ def create_package():
 
     if not isinstance(data, dict):
         return error_response(
-            "VALIDATION_ERROR",
-            "A JSON object is required.",
-            400,
+            "VALIDATION_ERROR", "A JSON object is required.", 400
         )
 
     carrier_name = data.get("carrier_name")
     tracking_code = data.get("tracking_code")
     resident_id = data.get("resident_id")
     description = data.get("description", "")
+    location_code = data.get("location_code")
 
-    if not isinstance(carrier_name, str) or not carrier_name.strip():
-        return error_response(
-            "VALIDATION_ERROR", "Carrier name is required.", 400
-        )
-
-    if len(carrier_name.strip()) > 50:
-        return error_response(
-            "VALIDATION_ERROR", "Carrier name is too long.", 400
-        )
-
-    if not isinstance(tracking_code, str) or not tracking_code.strip():
-        return error_response(
-            "VALIDATION_ERROR", "Tracking code is required.", 400
-        )
-
-    if len(tracking_code.strip()) > 100:
-        return error_response(
-            "VALIDATION_ERROR", "Tracking code is too long.", 400
-        )
+    for field, value, max_length in (
+        ("Carrier name", carrier_name, 50),
+        ("Tracking code", tracking_code, 100),
+        ("Storage location", location_code, 50),
+    ):
+        if not isinstance(value, str) or not value.strip():
+            return error_response(
+                "VALIDATION_ERROR", f"{field} is required.", 400
+            )
+        if len(value.strip()) > max_length:
+            return error_response(
+                "VALIDATION_ERROR", f"{field} is too long.", 400
+            )
 
     if type(resident_id) is not int or resident_id <= 0:
         return error_response(
@@ -172,6 +180,7 @@ def create_package():
             "SELECT id FROM users WHERE id = %s AND role = 'resident'",
             (resident_id,),
         )
+
         if cursor.fetchone() is None:
             return error_response(
                 "VALIDATION_ERROR",
@@ -183,10 +192,13 @@ def create_package():
             "SELECT id FROM packages WHERE tracking_code = %s LIMIT 1",
             (tracking_code.strip(),),
         )
+
         if cursor.fetchone() is not None:
             return error_response(
                 "CONFLICT", "Tracking code already exists.", 409
             )
+
+        actor_id = int(get_jwt_identity())
 
         cursor.execute(
             """
@@ -195,29 +207,44 @@ def create_package():
                 tracking_code,
                 resident_id,
                 description,
+                location_code,
                 status,
                 registered_by
             )
-            VALUES (%s, %s, %s, %s, 'received', %s)
+            VALUES (%s, %s, %s, %s, %s, 'received', %s)
             """,
             (
                 carrier_name.strip(),
                 tracking_code.strip(),
                 resident_id,
                 description.strip(),
-                int(get_jwt_identity()),
+                location_code.strip(),
+                actor_id,
             ),
         )
 
         package_id = cursor.lastrowid
-        connection.commit()
-
         package = fetch_package(cursor, package_id)
+
+        add_audit(
+            cursor, package_id, actor_id,
+            "created", None, package
+        )
+
+        connection.commit()
 
         return jsonify({
             "success": True,
             "package": package,
         }), 201
+
+    except IntegrityError as error:
+        if connection is not None:
+            connection.rollback()
+        current_app.logger.warning("Package conflict: %s", error)
+        return error_response(
+            "CONFLICT", "Package conflicts with existing data.", 409
+        )
 
     except (Error, RuntimeError, ValueError) as error:
         if connection is not None:
@@ -258,10 +285,10 @@ def list_packages():
                 OR p.carrier_name LIKE %s
                 OR r.name LIKE %s
                 OR r.unit LIKE %s
+                OR p.location_code LIKE %s
             )
         """)
-        search_term = f"%{search}%"
-        params.extend([search_term] * 4)
+        params.extend([f"%{search}%"] * 5)
 
     query = PACKAGE_SELECT
 
@@ -276,11 +303,11 @@ def list_packages():
     try:
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
-
         cursor.execute(query, tuple(params))
+
         packages = [
-            serialize_package(package)
-            for package in cursor.fetchall()
+            serialize_package(row)
+            for row in cursor.fetchall()
         ]
 
         return jsonify({
@@ -309,7 +336,6 @@ def get_package(package_id):
     try:
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
-
         package = fetch_package(cursor, package_id)
 
         if package is None:
@@ -341,40 +367,41 @@ def update_package(package_id):
 
     if not isinstance(data, dict):
         return error_response(
-            "VALIDATION_ERROR",
-            "A JSON object is required.",
-            400,
+            "VALIDATION_ERROR", "A JSON object is required.", 400
         )
 
-    editable_fields = {
+    editable_fields = (
         "status",
         "carrier_name",
         "tracking_code",
         "description",
-    }
-
-    fields_to_update = set(data) & editable_fields
-
-    if not fields_to_update:
-        return error_response(
-            "VALIDATION_ERROR",
-            "No editable package fields were provided.",
-            400,
-        )
+        "location_code",
+    )
 
     updates = {}
-    for field in fields_to_update:
+
+    for field in editable_fields:
+        if field not in data:
+            continue
+
         value = data[field]
 
         if field == "status":
             if not isinstance(value, str) or value not in VALID_STATUSES:
                 return error_response(
-                    "VALIDATION_ERROR",
-                    "Invalid package status.",
-                    400,
+                    "VALIDATION_ERROR", "Invalid package status.", 400
                 )
 
-        elif field in ("carrier_name", "tracking_code"):
+        elif field == "description":
+            if not isinstance(value, str):
+                return error_response(
+                    "VALIDATION_ERROR", "Description must be text.", 400
+                )
+            value = value.strip()
+
+        else:
+            max_length = 100 if field == "tracking_code" else 50
+
             if not isinstance(value, str) or not value.strip():
                 return error_response(
                     "VALIDATION_ERROR",
@@ -382,27 +409,23 @@ def update_package(package_id):
                     400,
                 )
 
-            max_length = 50 if field == "carrier_name" else 100
+            value = value.strip()
 
-            if len(value.strip()) > max_length:
+            if len(value) > max_length:
                 return error_response(
                     "VALIDATION_ERROR",
                     f"{field} is too long.",
                     400,
                 )
 
-            value = value.strip()
-
-        elif field == "description":
-            if not isinstance(value, str):
-                return error_response(
-                    "VALIDATION_ERROR",
-                    "Description must be text.",
-                    400,
-                )
-            value = value.strip()
-
         updates[field] = value
+
+    if not updates:
+        return error_response(
+            "VALIDATION_ERROR",
+            "No editable package fields were provided.",
+            400,
+        )
 
     connection = None
     cursor = None
@@ -411,26 +434,35 @@ def update_package(package_id):
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
 
-        # Lock this package until the transaction is committed.
         cursor.execute(
-            "SELECT id, status FROM packages WHERE id = %s FOR UPDATE",
+            """
+            SELECT
+                id, status, carrier_name, tracking_code,
+                description, location_code
+            FROM packages
+            WHERE id = %s
+            FOR UPDATE
+            """,
             (package_id,),
         )
+
         existing = cursor.fetchone()
 
         if existing is None:
+            connection.rollback()
             return error_response(
                 "NOT_FOUND", "Package not found.", 404
             )
 
         if "status" in updates:
-            current_status = existing["status"]
+            old_status = existing["status"]
             new_status = updates["status"]
 
             if (
-                new_status != current_status
-                and new_status not in ALLOWED_TRANSITIONS[current_status]
+                new_status != old_status
+                and new_status not in ALLOWED_TRANSITIONS[old_status]
             ):
+                connection.rollback()
                 return error_response(
                     "INVALID_STATUS_TRANSITION",
                     "This package status change is not allowed.",
@@ -446,20 +478,76 @@ def update_package(package_id):
                 """,
                 (updates["tracking_code"], package_id),
             )
+
             if cursor.fetchone() is not None:
+                connection.rollback()
                 return error_response(
-                    "CONFLICT", "Tracking code already exists.", 409
+                    "CONFLICT",
+                    "Tracking code already exists.",
+                    409,
                 )
 
-        assignments = ", ".join(
-            f"{field} = %s" for field in updates
-        )
-        values = list(updates.values()) + [package_id]
+        changed_old = {
+            field: existing[field]
+            for field in updates
+            if existing[field] != updates[field]
+        }
 
-        cursor.execute(
-            f"UPDATE packages SET {assignments} WHERE id = %s",
-            tuple(values),
-        )
+        changed_new = {
+            field: updates[field]
+            for field in changed_old
+        }
+
+        if changed_new:
+            assignments = ", ".join(
+                f"{field} = %s" for field in changed_new
+            )
+
+            cursor.execute(
+                f"UPDATE packages SET {assignments} WHERE id = %s",
+                tuple(changed_new.values()) + (package_id,),
+            )
+
+            action = (
+                "status_changed"
+                if "status" in changed_new
+                else "updated"
+            )
+
+            add_audit(
+                cursor,
+                package_id,
+                int(get_jwt_identity()),
+                action,
+                changed_old,
+                changed_new,
+            )
+
+        # Sprint 3: completing a pickup must also complete its appointment.
+        # This runs before commit, so both changes succeed or roll back together.
+        if changed_new.get("status") == "picked_up":
+            cursor.execute(
+                """
+                UPDATE pickup_appointments
+                SET status = 'completed'
+                WHERE package_id = %s
+                  AND status = 'scheduled'
+                """,
+                (package_id,),
+            )
+
+        # Sprint 3: completing a pickup must also complete its appointment.
+        # This runs before commit, so both changes succeed or roll back together.
+        if changed_new.get("status") == "picked_up":
+            cursor.execute(
+                """
+                UPDATE pickup_appointments
+                SET status = 'completed'
+                WHERE package_id = %s
+                  AND status = 'scheduled'
+                """,
+                (package_id,),
+            )
 
         connection.commit()
         package = fetch_package(cursor, package_id)
@@ -474,12 +562,82 @@ def update_package(package_id):
             connection.rollback()
         current_app.logger.warning("Package conflict: %s", error)
         return error_response(
-            "CONFLICT", "Package update conflicts with existing data.", 409
+            "CONFLICT",
+            "Package update conflicts with existing data.",
+            409,
         )
 
     except (Error, RuntimeError) as error:
         if connection is not None:
             connection.rollback()
+        return database_error(error)
+
+    finally:
+        close_resources(cursor, connection)
+
+
+@packages_bp.route(
+    "/api/packages/<int:package_id>/audit",
+    methods=["GET"],
+)
+@jwt_required()
+def package_audit(package_id):
+    if not staff_only():
+        return error_response(
+            "FORBIDDEN", "Staff access required.", 403
+        )
+
+    connection = None
+    cursor = None
+
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        if fetch_package(cursor, package_id) is None:
+            return error_response(
+                "NOT_FOUND", "Package not found.", 404
+            )
+
+        cursor.execute(
+            """
+            SELECT
+                a.id,
+                a.package_id,
+                a.changed_by,
+                u.name AS changed_by_name,
+                a.action,
+                a.old_values,
+                a.new_values,
+                a.changed_at
+            FROM package_audit_log AS a
+            JOIN users AS u ON u.id = a.changed_by
+            WHERE a.package_id = %s
+            ORDER BY a.changed_at DESC, a.id DESC
+            """,
+            (package_id,),
+        )
+
+        events = cursor.fetchall()
+
+        for event in events:
+            changed_at = event["changed_at"]
+
+            if isinstance(changed_at, datetime):
+                event["changed_at"] = changed_at.replace(
+                    tzinfo=timezone.utc
+                ).isoformat()
+
+            for key in ("old_values", "new_values"):
+                if isinstance(event[key], str):
+                    event[key] = json.loads(event[key])
+
+        return jsonify({
+            "success": True,
+            "audit": events,
+        }), 200
+
+    except (Error, RuntimeError, ValueError) as error:
         return database_error(error)
 
     finally:
@@ -512,8 +670,8 @@ def my_packages():
         )
 
         packages = [
-            serialize_package(package)
-            for package in cursor.fetchall()
+            serialize_package(row)
+            for row in cursor.fetchall()
         ]
 
         return jsonify({

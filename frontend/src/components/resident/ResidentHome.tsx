@@ -18,6 +18,13 @@ import { SparklesCore } from "@/components/ui/sparkles";
 import { WeekStripCalendar, type DaySchedule } from "./WeekStripCalendar";
 import { addDays, startOfDay } from "date-fns";
 import { getMyPackages, type PackageRecord } from "@/api/packagesApi";
+import {
+  getAppointments,
+  createAppointment,
+  cancelAppointment,
+  type PickupAppointment,
+} from "@/api/appointmentsApi";
+
 
 /* Bottom navigation tabs */
 const tabs = [{ name: "Home", icon: House }, { name: "Packages", icon: Package }, { name: "Schedule", icon: CalendarDays }, { name: "Pickups", icon: History }, { name: "Profile", icon: UserRound }] as const;
@@ -48,6 +55,85 @@ export function ResidentHome() {
   useEffect(() => {
     fetchPackages();
   }, [fetchPackages]);
+
+
+  /* Sprint 3 — real pickup appointments */
+  const [appointments, setAppointments] = useState<PickupAppointment[]>([]);
+  const [appointmentError, setAppointmentError] = useState("");
+  const [appointmentSuccess, setAppointmentSuccess] = useState("");
+  const [appointmentBusy, setAppointmentBusy] = useState(false);
+  const [bookingPackageId, setBookingPackageId] = useState("");
+  const [bookingDate, setBookingDate] = useState("");
+  const [bookingTime, setBookingTime] = useState("09:00");
+
+  const fetchAppointments = useCallback(async () => {
+    try {
+      setAppointments(await getAppointments());
+    } catch (error) {
+      setAppointmentError(
+        error instanceof Error ? error.message : "Could not load appointments."
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
+
+  const upcomingAppointments = appointments.filter(
+    (a) => a.status === "scheduled"
+  );
+
+  const availablePackages = packages.filter(
+    (p) => p.status === "available"
+  );
+
+  const bookPickup = async () => {
+    setAppointmentError("");
+    setAppointmentSuccess("");
+
+    if (!bookingPackageId || !bookingDate || !bookingTime) {
+      setAppointmentError("Select a package, date, and time.");
+      return;
+    }
+
+    setAppointmentBusy(true);
+    try {
+      await createAppointment(
+        Number(bookingPackageId),
+        `${bookingDate}T${bookingTime}`,
+      );
+      setAppointmentSuccess("Pickup scheduled successfully!");
+      setBookingPackageId("");
+      await Promise.all([fetchAppointments(), fetchPackages()]);
+    } catch (error) {
+      setAppointmentError(
+        error instanceof Error ? error.message : "Could not schedule pickup."
+      );
+    } finally {
+      setAppointmentBusy(false);
+    }
+  };
+
+  const cancelPickup = async (id: number) => {
+    if (!window.confirm("Cancel this pickup appointment?")) return;
+
+    setAppointmentError("");
+    setAppointmentSuccess("");
+    setAppointmentBusy(true);
+
+    try {
+      await cancelAppointment(id);
+      setAppointmentSuccess("Pickup cancelled successfully.");
+      await Promise.all([fetchAppointments(), fetchPackages()]);
+    } catch (error) {
+      setAppointmentError(
+        error instanceof Error ? error.message : "Could not cancel pickup."
+      );
+    } finally {
+      setAppointmentBusy(false);
+    }
+  };
 
   /* Active packages = everything except picked_up */
   const activePackages = packages.filter((p) => p.status !== "picked_up");
@@ -172,7 +258,7 @@ export function ResidentHome() {
                         trackingCode={pkg.tracking_code}
                         status={pkg.status}
                         arrivedAt={pkg.arrived_at}
-                        description={pkg.description || undefined}
+                        {...(pkg.description ? { description: pkg.description } : {})}
                       />
                     ))}
                     {tab === "Home" && activePackages.length > 3 && (
@@ -182,36 +268,180 @@ export function ResidentHome() {
                     )}
                   </div>
                 ) : (
-                  <Card hover={tab === "Home"} onClick={tab === "Home" ? () => setTab("Packages") : undefined}>
+                  <Card hover={tab === "Home"} {...(tab === "Home" ? { onClick: () => setTab("Packages") } : {})}>
                     <EmptyState icon={Package} message="No packages waiting for you right now" />
                   </Card>
                 )}
               </section>
             )}
 
-            {/* ── UPCOMING PICKUPS — Home tab only ── */}
+
+            {/* Sprint 3 — Upcoming pickups */}
             {tab === "Home" && (
               <section className="animate-fade-in-up stagger-2">
                 <div className="mb-3 flex items-center justify-between">
-                  <h2 className="font-display text-xl font-semibold uppercase">Upcoming Pickups</h2>
+                  <h2 className="font-display text-xl font-semibold uppercase">
+                    Upcoming Pickups
+                  </h2>
                   <span className="font-mono text-xs text-muted-foreground">
-                    {String(packages.filter((p) => p.status === "scheduled").length).padStart(2, "0")}
+                    {String(upcomingAppointments.length).padStart(2, "0")}
                   </span>
                 </div>
-                <Card hover onClick={() => setTab("Schedule")}>
-                  <EmptyState icon={Clock3} message="No pickups scheduled — tap to schedule" />
-                </Card>
+
+                {upcomingAppointments.length ? (
+                  <div className="space-y-3">
+                    {upcomingAppointments.map((appointment) => (
+                      <Card key={appointment.id} className="p-4">
+                        <p className="font-medium">
+                          {appointment.carrier_name} — {appointment.tracking_code}
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {new Date(appointment.pickup_start).toLocaleString()}
+                        </p>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="mt-3"
+                          onClick={() => cancelPickup(appointment.id)}
+                          disabled={appointmentBusy}
+                        >
+                          Cancel Pickup
+                        </Button>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <Card hover onClick={() => setTab("Schedule")}>
+                    <EmptyState
+                      icon={Clock3}
+                      message="No pickups scheduled — tap to schedule"
+                    />
+                  </Card>
+                )}
               </section>
             )}
 
-            {/* ── SCHEDULE tab ── */}
+            {/* Sprint 3 — Real pickup booking */}
             {tab === "Schedule" && (
-              <section className="animate-fade-in-up md:col-span-2">
-                <WeekStripCalendar
-                  schedules={demoSchedules}
-                  selectedSlotId={selectedSlotId}
-                  onSlotSelect={(_date, slot) => setSelectedSlotId(slot.id)}
-                />
+              <section className="animate-fade-in-up md:col-span-2 space-y-5">
+                <Card className="p-6">
+                  <h2 className="font-display text-xl font-semibold uppercase">
+                    Schedule a Package Pickup
+                  </h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Choose an available package and a weekday pickup slot.
+                    Appointments are 30 minutes, from 9 AM to 5 PM.
+                  </p>
+
+                  <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                    <label className="text-sm">
+                      Package
+                      <select
+                        className="mt-2 w-full rounded-lg border border-border bg-background p-3"
+                        value={bookingPackageId}
+                        onChange={(event) => setBookingPackageId(event.target.value)}
+                      >
+                        <option value="">Select package</option>
+                        {availablePackages.map((pkg) => (
+                          <option key={pkg.id} value={pkg.id}>
+                            {pkg.carrier_name} — {pkg.tracking_code}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="text-sm">
+                      Pickup Date
+                      <input
+                        type="date"
+                        className="mt-2 w-full rounded-lg border border-border bg-background p-3"
+                        min={new Date().toLocaleDateString("en-CA")}
+                        value={bookingDate}
+                        onChange={(event) => setBookingDate(event.target.value)}
+                      />
+                    </label>
+
+                    <label className="text-sm">
+                      Pickup Time
+                      <select
+                        className="mt-2 w-full rounded-lg border border-border bg-background p-3"
+                        value={bookingTime}
+                        onChange={(event) => setBookingTime(event.target.value)}
+                      >
+                        {Array.from({ length: 16 }, (_, index) => {
+                          const hour = 9 + Math.floor(index / 2);
+                          const minute = index % 2 ? "30" : "00";
+                          const time = `${String(hour).padStart(2, "0")}:${minute}`;
+                          return (
+                            <option key={time} value={time}>
+                              {time}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </label>
+                  </div>
+
+                  <Button
+                    className="mt-5"
+                    onClick={bookPickup}
+                    disabled={appointmentBusy || availablePackages.length === 0}
+                  >
+                    {appointmentBusy ? "Saving..." : "Confirm Pickup"}
+                  </Button>
+
+                  {availablePackages.length === 0 && (
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      You have no available packages to schedule.
+                    </p>
+                  )}
+                  {appointmentError && (
+                    <p role="alert" className="mt-3 text-sm text-red-500">
+                      {appointmentError}
+                    </p>
+                  )}
+                  {appointmentSuccess && (
+                    <p className="mt-3 text-sm text-green-500">
+                      {appointmentSuccess}
+                    </p>
+                  )}
+                </Card>
+
+                <Card className="p-6">
+                  <h2 className="font-display text-xl font-semibold uppercase">
+                    Your Scheduled Pickups
+                  </h2>
+                  {upcomingAppointments.length === 0 ? (
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      No pickups scheduled yet.
+                    </p>
+                  ) : (
+                    <div className="mt-4 space-y-4">
+                      {upcomingAppointments.map((appointment) => (
+                        <div
+                          key={appointment.id}
+                          className="rounded-lg border border-border p-4"
+                        >
+                          <p className="font-medium">
+                            {appointment.carrier_name} — {appointment.tracking_code}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {new Date(appointment.pickup_start).toLocaleString()}
+                          </p>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="mt-3"
+                            onClick={() => cancelPickup(appointment.id)}
+                            disabled={appointmentBusy}
+                          >
+                            Cancel Pickup
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
               </section>
             )}
 
@@ -228,7 +458,7 @@ export function ResidentHome() {
                         trackingCode={pkg.tracking_code}
                         status={pkg.status}
                         arrivedAt={pkg.arrived_at}
-                        description={pkg.description || undefined}
+                        {...(pkg.description ? { description: pkg.description } : {})}
                       />
                     ))}
                   </div>
