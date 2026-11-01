@@ -574,19 +574,6 @@ def update_package(package_id):
                 (package_id,),
             )
 
-        # Sprint 3: completing a pickup must also complete its appointment.
-        # This runs before commit, so both changes succeed or roll back together.
-        if changed_new.get("status") == "picked_up":
-            cursor.execute(
-                """
-                UPDATE pickup_appointments
-                SET status = 'completed'
-                WHERE package_id = %s
-                  AND status = 'scheduled'
-                """,
-                (package_id,),
-            )
-
         connection.commit()
         package = fetch_package(cursor, package_id)
 
