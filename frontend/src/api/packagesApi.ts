@@ -1,16 +1,13 @@
+
 /**
- * packagesApi.ts — Package CRUD operations for Red-E Now.
+ * packagesApi.ts — Package CRUD operations for RED-E-NOW.
  *
- * Calls the Flask backend endpoints when available.
- * Falls back to in-memory mock data so the frontend is fully
- * functional before Rehman's backend endpoints are live.
- *
- * Toggle: set VITE_USE_MOCK=true (or leave backend offline)
- *         to use mock data automatically.
+ * Uses the Flask backend when VITE_USE_MOCK=false.
+ * Uses in-memory development data when VITE_USE_MOCK=true.
  */
+
 import { api, ApiError } from "./client";
 
-/* ── Types ── */
 export type PackageStatus =
   | "received"
   | "available"
@@ -24,7 +21,8 @@ export interface PackageRecord {
   tracking_code: string;
   status: PackageStatus;
   description: string;
-  arrived_at: string;          // ISO 8601 or display string
+  location_code: string | null;
+  arrived_at: string;
   resident_id: number;
   resident_name: string;
   resident_unit?: string;
@@ -36,6 +34,7 @@ export interface RegisterPackagePayload {
   tracking_code: string;
   resident_id: number;
   description?: string;
+  location_code: string;
 }
 
 export interface UpdatePackagePayload {
@@ -43,13 +42,26 @@ export interface UpdatePackagePayload {
   carrier_name?: string;
   tracking_code?: string;
   description?: string;
+  location_code?: string;
 }
 
-/* ── Mock data ── */
-const isBrowser = typeof window !== "undefined";
-const useMock = isBrowser && import.meta.env.VITE_USE_MOCK === "true";
+export interface PackageAuditEntry {
+  id: number;
+  package_id: number;
+  changed_by: number;
+  changed_by_name: string;
+  action: "created" | "updated" | "status_changed";
+  old_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
+  changed_at: string;
+}
+
+const useMock =
+  typeof window !== "undefined" &&
+  import.meta.env["VITE_USE_MOCK"] === "true";
 
 let nextId = 6;
+
 const MOCK_PACKAGES: PackageRecord[] = [
   {
     id: 1,
@@ -57,6 +69,7 @@ const MOCK_PACKAGES: PackageRecord[] = [
     tracking_code: "1Z999AA10123456784",
     status: "received",
     description: "Small box",
+    location_code: "SHELF-A1",
     arrived_at: "Oct 18, 2026",
     resident_id: 1,
     resident_name: "Maya Chen",
@@ -69,6 +82,7 @@ const MOCK_PACKAGES: PackageRecord[] = [
     tracking_code: "9400111899223100012",
     status: "available",
     description: "Large envelope",
+    location_code: "SHELF-A2",
     arrived_at: "Oct 19, 2026",
     resident_id: 1,
     resident_name: "Maya Chen",
@@ -81,6 +95,7 @@ const MOCK_PACKAGES: PackageRecord[] = [
     tracking_code: "TBA304958392710",
     status: "prepared",
     description: "Medium box",
+    location_code: "BIN-B1",
     arrived_at: "Oct 17, 2026",
     resident_id: 3,
     resident_name: "Jordan Lee",
@@ -93,6 +108,7 @@ const MOCK_PACKAGES: PackageRecord[] = [
     tracking_code: "9200190143833100012",
     status: "picked_up",
     description: "Flat mailer",
+    location_code: "SHELF-C1",
     arrived_at: "Oct 15, 2026",
     resident_id: 1,
     resident_name: "Maya Chen",
@@ -105,6 +121,7 @@ const MOCK_PACKAGES: PackageRecord[] = [
     tracking_code: "JD014600003812345",
     status: "scheduled",
     description: "Small parcel",
+    location_code: "BIN-B2",
     arrived_at: "Oct 20, 2026",
     resident_id: 4,
     resident_name: "Sam Rivera",
@@ -113,53 +130,83 @@ const MOCK_PACKAGES: PackageRecord[] = [
   },
 ];
 
-/* Deep-copy helper so mutations don't pollute the source array */
-const clonePkgs = () => JSON.parse(JSON.stringify(MOCK_PACKAGES)) as PackageRecord[];
+const MOCK_AUDIT: PackageAuditEntry[] = [];
 
-/* Simulate network latency */
-const delay = (ms = 300) => new Promise<void>((r) => setTimeout(r, ms));
+const clonePkgs = (): PackageRecord[] =>
+  JSON.parse(JSON.stringify(MOCK_PACKAGES)) as PackageRecord[];
 
-/* ── API wrappers ── */
+const delay = (ms = 300) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function addMockAudit(
+  pkg: PackageRecord,
+  action: PackageAuditEntry["action"],
+  oldValues: Record<string, unknown> | null,
+  newValues: Record<string, unknown> | null,
+): void {
+  MOCK_AUDIT.push({
+    id: MOCK_AUDIT.length + 1,
+    package_id: pkg.id,
+    changed_by: 2,
+    changed_by_name: "Mock Front Desk Staff",
+    action,
+    old_values: oldValues,
+    new_values: newValues,
+    changed_at: new Date().toISOString(),
+  });
+}
 
 /**
- * Register a new package (staff only).
- * POST /api/packages
+ * POST /api/packages — Staff only.
  */
 export async function registerPackage(
   payload: RegisterPackagePayload,
 ): Promise<PackageRecord> {
   if (useMock) {
     await delay();
+
+    if (!payload.location_code.trim()) {
+      throw new ApiError(
+        "VALIDATION_ERROR",
+        "Storage location is required.",
+        400,
+      );
+    }
+
     const pkg: PackageRecord = {
       id: nextId++,
       carrier_name: payload.carrier_name,
       tracking_code: payload.tracking_code,
       status: "received",
       description: payload.description || "",
-      arrived_at: new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }).format(new Date()),
+      location_code: payload.location_code.trim(),
+      arrived_at: new Date().toISOString(),
       resident_id: payload.resident_id,
-      resident_name: "Maya Chen",  // mock — real name comes from backend join
+      resident_name: "Maya Chen",
       resident_unit: "4B",
       registered_by: 2,
     };
+
     MOCK_PACKAGES.unshift(pkg);
-    return pkg;
+    addMockAudit(pkg, "created", null, { ...pkg });
+
+    return { ...pkg };
   }
 
-  const res = await api<{ success: boolean; package: PackageRecord }>(
-    "/packages",
-    { method: "POST", body: JSON.stringify(payload) },
-  );
+  const res = await api<{
+    success: boolean;
+    package: PackageRecord;
+  }>("/packages", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
   return res.package;
 }
 
 /**
- * List all packages (staff only).
- * GET /api/packages?status=&search=
+ * GET /api/packages — Staff only.
+ * Supports status and text search, including location codes.
  */
 export async function getPackages(filters?: {
   status?: PackageStatus;
@@ -167,52 +214,77 @@ export async function getPackages(filters?: {
 }): Promise<PackageRecord[]> {
   if (useMock) {
     await delay();
+
     let list = clonePkgs();
-    if (filters?.status) list = list.filter((p) => p.status === filters.status);
+
+    if (filters?.status) {
+      list = list.filter((pkg) => pkg.status === filters.status);
+    }
+
     if (filters?.search) {
       const q = filters.search.toLowerCase();
+
       list = list.filter(
-        (p) =>
-          p.tracking_code.toLowerCase().includes(q) ||
-          p.resident_name.toLowerCase().includes(q) ||
-          p.carrier_name.toLowerCase().includes(q) ||
-          (p.resident_unit || "").toLowerCase().includes(q),
+        (pkg) =>
+          pkg.tracking_code.toLowerCase().includes(q) ||
+          pkg.resident_name.toLowerCase().includes(q) ||
+          pkg.carrier_name.toLowerCase().includes(q) ||
+          (pkg.resident_unit || "").toLowerCase().includes(q) ||
+          (pkg.location_code || "").toLowerCase().includes(q),
       );
     }
+
     return list;
   }
 
   const params = new URLSearchParams();
-  if (filters?.status) params.set("status", filters.status);
-  if (filters?.search) params.set("search", filters.search);
-  const qs = params.toString();
-  const res = await api<{ success: boolean; packages: PackageRecord[] }>(
-    `/packages${qs ? `?${qs}` : ""}`,
-  );
+
+  if (filters?.status) {
+    params.set("status", filters.status);
+  }
+
+  if (filters?.search) {
+    params.set("search", filters.search);
+  }
+
+  const query = params.toString();
+
+  const res = await api<{
+    success: boolean;
+    packages: PackageRecord[];
+  }>(`/packages${query ? `?${query}` : ""}`);
+
   return res.packages;
 }
 
 /**
- * Get a single package by ID (staff only).
- * GET /api/packages/:id
+ * GET /api/packages/:id — Staff only.
  */
-export async function getPackage(id: number): Promise<PackageRecord> {
+export async function getPackage(
+  id: number,
+): Promise<PackageRecord> {
   if (useMock) {
     await delay(200);
-    const pkg = MOCK_PACKAGES.find((p) => p.id === id);
-    if (!pkg) throw new ApiError("NOT_FOUND", "Package not found", 404);
+
+    const pkg = MOCK_PACKAGES.find((item) => item.id === id);
+
+    if (!pkg) {
+      throw new ApiError("NOT_FOUND", "Package not found", 404);
+    }
+
     return { ...pkg };
   }
 
-  const res = await api<{ success: boolean; package: PackageRecord }>(
-    `/packages/${id}`,
-  );
+  const res = await api<{
+    success: boolean;
+    package: PackageRecord;
+  }>(`/packages/${id}`);
+
   return res.package;
 }
 
 /**
- * Update a package (staff only).
- * PUT /api/packages/:id
+ * PUT /api/packages/:id — Staff only.
  */
 export async function updatePackage(
   id: number,
@@ -220,32 +292,90 @@ export async function updatePackage(
 ): Promise<PackageRecord> {
   if (useMock) {
     await delay();
-    const pkg = MOCK_PACKAGES.find((p) => p.id === id);
-    if (!pkg) throw new ApiError("NOT_FOUND", "Package not found", 404);
-    Object.assign(pkg, payload);
+
+    const pkg = MOCK_PACKAGES.find((item) => item.id === id);
+
+    if (!pkg) {
+      throw new ApiError("NOT_FOUND", "Package not found", 404);
+    }
+
+    const oldValues: Record<string, unknown> = {};
+    const newValues: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(payload)) {
+      const field = key as keyof UpdatePackagePayload;
+
+      if (value !== undefined && pkg[field] !== value) {
+        oldValues[key] = pkg[field];
+        newValues[key] = value;
+      }
+    }
+
+    if (Object.keys(newValues).length > 0) {
+      Object.assign(pkg, newValues);
+
+      addMockAudit(
+        pkg,
+        "status" in newValues ? "status_changed" : "updated",
+        oldValues,
+        newValues,
+      );
+    }
+
     return { ...pkg };
   }
 
-  const res = await api<{ success: boolean; package: PackageRecord }>(
-    `/packages/${id}`,
-    { method: "PUT", body: JSON.stringify(payload) },
-  );
+  const res = await api<{
+    success: boolean;
+    package: PackageRecord;
+  }>(`/packages/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
   return res.package;
 }
 
 /**
- * Get the current resident's packages.
- * GET /api/my-packages
+ * GET /api/packages/:id/audit — Staff only.
+ */
+export async function getPackageAudit(
+  id: number,
+): Promise<PackageAuditEntry[]> {
+  if (useMock) {
+    await delay(200);
+
+    if (!MOCK_PACKAGES.some((pkg) => pkg.id === id)) {
+      throw new ApiError("NOT_FOUND", "Package not found", 404);
+    }
+
+    return MOCK_AUDIT
+      .filter((entry) => entry.package_id === id)
+      .reverse()
+      .map((entry) => ({ ...entry }));
+  }
+
+  const res = await api<{
+    success: boolean;
+    audit: PackageAuditEntry[];
+  }>(`/packages/${id}/audit`);
+
+  return res.audit;
+}
+
+/**
+ * GET /api/my-packages — Resident only.
  */
 export async function getMyPackages(): Promise<PackageRecord[]> {
   if (useMock) {
     await delay();
-    // Mock: return only Maya Chen's packages (resident_id 1)
-    return clonePkgs().filter((p) => p.resident_id === 1);
+    return clonePkgs().filter((pkg) => pkg.resident_id === 1);
   }
 
-  const res = await api<{ success: boolean; packages: PackageRecord[] }>(
-    "/my-packages",
-  );
+  const res = await api<{
+    success: boolean;
+    packages: PackageRecord[];
+  }>("/my-packages");
+
   return res.packages;
 }

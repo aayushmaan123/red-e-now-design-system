@@ -15,13 +15,17 @@ import { Avatar, Button, Card, EmptyState, PackageCard, TabBar } from "@/compone
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { SparklesCore } from "@/components/ui/sparkles";
-import { WeekStripCalendar, type DaySchedule } from "./WeekStripCalendar";
-import { addDays, startOfDay } from "date-fns";
 import { getMyPackages, type PackageRecord } from "@/api/packagesApi";
+import {
+  getPickupSlots,
+  type PickupSlot,
+} from "@/api/schedulingApi";
+
 import {
   getAppointments,
   createAppointment,
   cancelAppointment,
+  rescheduleAppointment,
   type PickupAppointment,
 } from "@/api/appointmentsApi";
 
@@ -34,7 +38,6 @@ export function ResidentHome() {
   const navigate = useNavigate();
   const { toggle, isDark } = useTheme();
   const [tab, setTab] = useState<(typeof tabs)[number]["name"]>("Home");
-  const [selectedSlotId, setSelectedSlotId] = useState<string | undefined>();
 
   /* ── Package data ── */
   const [packages, setPackages] = useState<PackageRecord[]>([]);
@@ -66,6 +69,11 @@ export function ResidentHome() {
   const [bookingDate, setBookingDate] = useState("");
   const [bookingTime, setBookingTime] = useState("09:00");
 
+  const [pickupSlots, setPickupSlots] = useState<PickupSlot[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [reschedulingId, setReschedulingId] = useState<number | null>(null);
+
+
   const fetchAppointments = useCallback(async () => {
     try {
       setAppointments(await getAppointments());
@@ -80,6 +88,32 @@ export function ResidentHome() {
     fetchAppointments();
   }, [fetchAppointments]);
 
+
+  const refreshSlots = useCallback(async () => {
+    if (!bookingDate) {
+      setPickupSlots([]);
+      return;
+    }
+
+    setSlotsLoading(true);
+    try {
+      setPickupSlots(await getPickupSlots(bookingDate));
+    } catch (error) {
+      setPickupSlots([]);
+      setAppointmentError(
+        error instanceof Error
+          ? error.message
+          : "Could not load available pickup times."
+      );
+    } finally {
+      setSlotsLoading(false);
+    }
+  }, [bookingDate]);
+
+  useEffect(() => {
+    refreshSlots();
+  }, [refreshSlots]);
+
   const upcomingAppointments = appointments.filter(
     (a) => a.status === "scheduled"
   );
@@ -92,27 +126,59 @@ export function ResidentHome() {
     setAppointmentError("");
     setAppointmentSuccess("");
 
-    if (!bookingPackageId || !bookingDate || !bookingTime) {
+    if ((!bookingPackageId && reschedulingId === null) || !bookingDate || !bookingTime) {
       setAppointmentError("Select a package, date, and time.");
+      return;
+    }
+
+    const selectedStart = `${bookingDate}T${bookingTime}`;
+    if (!pickupSlots.some(
+      (slot) => slot.pickup_start === selectedStart && slot.available
+    )) {
+      setAppointmentError(
+        "This time is no longer available. Please select another slot."
+      );
+      await refreshSlots();
       return;
     }
 
     setAppointmentBusy(true);
     try {
-      await createAppointment(
-        Number(bookingPackageId),
-        `${bookingDate}T${bookingTime}`,
-      );
-      setAppointmentSuccess("Pickup scheduled successfully!");
+      if (reschedulingId !== null) {
+        await rescheduleAppointment(
+          reschedulingId,
+          `${bookingDate}T${bookingTime}`,
+        );
+        setAppointmentSuccess("Pickup rescheduled successfully!");
+        setReschedulingId(null);
+      } else {
+        await createAppointment(
+          Number(bookingPackageId),
+          `${bookingDate}T${bookingTime}`,
+        );
+        setAppointmentSuccess("Pickup scheduled successfully!");
+      }
       setBookingPackageId("");
-      await Promise.all([fetchAppointments(), fetchPackages()]);
+      await Promise.all([fetchAppointments(), fetchPackages(), refreshSlots()]);
     } catch (error) {
       setAppointmentError(
         error instanceof Error ? error.message : "Could not schedule pickup."
       );
+      await refreshSlots();
     } finally {
       setAppointmentBusy(false);
     }
+  };
+
+
+  const beginReschedule = (appointment: PickupAppointment) => {
+    setAppointmentError("");
+    setAppointmentSuccess("");
+    setReschedulingId(appointment.id);
+    setBookingPackageId(String(appointment.package_id));
+    setBookingDate(appointment.pickup_start.slice(0, 10));
+    setBookingTime(appointment.pickup_start.slice(11, 16));
+    setTab("Schedule");
   };
 
   const cancelPickup = async (id: number) => {
@@ -125,7 +191,7 @@ export function ResidentHome() {
     try {
       await cancelAppointment(id);
       setAppointmentSuccess("Pickup cancelled successfully.");
-      await Promise.all([fetchAppointments(), fetchPackages()]);
+      await Promise.all([fetchAppointments(), fetchPackages(), refreshSlots()]);
     } catch (error) {
       setAppointmentError(
         error instanceof Error ? error.message : "Could not cancel pickup."
@@ -137,32 +203,6 @@ export function ResidentHome() {
 
   /* Active packages = everything except picked_up */
   const activePackages = packages.filter((p) => p.status !== "picked_up");
-
-  /* Demo schedule data — replace with usePickupSlots hook when backend is ready */
-  const demoSchedules: DaySchedule[] = useMemo(() => {
-    const today = startOfDay(new Date());
-    return [
-      { date: today, slots: [
-        { id: "t-1", time: "10:00 AM – 10:30 AM", available: true },
-        { id: "t-2", time: "11:00 AM – 11:30 AM", available: true },
-        { id: "t-3", time: "1:00 PM – 1:30 PM", available: false },
-        { id: "t-4", time: "3:00 PM – 3:30 PM", available: true },
-      ]},
-      { date: addDays(today, 1), slots: [
-        { id: "t-5", time: "9:00 AM – 9:30 AM", available: true },
-        { id: "t-6", time: "12:00 PM – 12:30 PM", available: true },
-        { id: "t-7", time: "4:00 PM – 4:30 PM", available: true },
-      ]},
-      { date: addDays(today, 2), slots: [
-        { id: "t-8", time: "10:00 AM – 10:30 AM", available: true },
-        { id: "t-9", time: "2:00 PM – 2:30 PM", available: true },
-      ], packageCount: 2 },
-      { date: addDays(today, 4), slots: [
-        { id: "t-10", time: "11:00 AM – 11:30 AM", available: true },
-        { id: "t-11", time: "3:00 PM – 3:30 PM", available: false },
-      ]},
-    ];
-  }, []);
 
   return (
     <div className="relative min-h-screen bg-background pb-20 transition-theme overflow-hidden">
@@ -298,7 +338,15 @@ export function ResidentHome() {
                         <p className="mt-2 text-sm text-muted-foreground">
                           {new Date(appointment.pickup_start).toLocaleString()}
                         </p>
-                        <Button
+                        <button
+                            type="button"
+                            onClick={() => beginReschedule(appointment)}
+                            disabled={appointmentBusy}
+                            className="min-h-11 rounded-lg border border-border px-3 py-2 text-sm"
+                          >
+                            Reschedule
+                          </button>
+                          <Button
                           variant="secondary"
                           size="sm"
                           className="mt-3"
@@ -326,7 +374,7 @@ export function ResidentHome() {
               <section className="animate-fade-in-up md:col-span-2 space-y-5">
                 <Card className="p-6">
                   <h2 className="font-display text-xl font-semibold uppercase">
-                    Schedule a Package Pickup
+                    {reschedulingId !== null ? "Reschedule Pickup" : "Schedule a Package Pickup"}
                   </h2>
                   <p className="mt-2 text-sm text-muted-foreground">
                     Choose an available package and a weekday pickup slot.
@@ -339,9 +387,19 @@ export function ResidentHome() {
                       <select
                         className="mt-2 w-full rounded-lg border border-border bg-background p-3"
                         value={bookingPackageId}
+                        disabled={reschedulingId !== null}
                         onChange={(event) => setBookingPackageId(event.target.value)}
                       >
-                        <option value="">Select package</option>
+                        <option value="">
+                          {reschedulingId !== null ? "Current package" : "Select package"}
+                        </option>
+                        {reschedulingId !== null && packages
+                          .filter((pkg) => String(pkg.id) === bookingPackageId)
+                          .map((pkg) => (
+                            <option key={pkg.id} value={pkg.id}>
+                              {pkg.carrier_name} — {pkg.tracking_code}
+                            </option>
+                          ))}
                         {availablePackages.map((pkg) => (
                           <option key={pkg.id} value={pkg.id}>
                             {pkg.carrier_name} — {pkg.tracking_code}
@@ -382,15 +440,79 @@ export function ResidentHome() {
                     </label>
                   </div>
 
-                  <Button
+                  
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium">
+                      Available pickup times
+                    </label>
+                    {slotsLoading ? (
+                      <p className="text-sm text-muted-foreground">
+                        Loading available times...
+                      </p>
+                    ) : pickupSlots.filter((slot) => slot.available).length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No open pickup times for this date. Choose another date.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {pickupSlots
+                          .filter((slot) => slot.available)
+                          .map((slot) => {
+                            const time = slot.pickup_start.slice(11, 16);
+                            const selected = bookingTime === time;
+                            return (
+                              <button
+                                key={slot.pickup_start}
+                                type="button"
+                                onClick={() => setBookingTime(time)}
+                                aria-pressed={selected}
+                                className={`min-h-11 rounded-lg border px-3 py-2 text-sm ${
+                                  selected
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-border bg-card"
+                                }`}
+                              >
+                                {time}
+                                <span className="block text-xs opacity-70">
+                                  {slot.remaining} remaining
+                                </span>
+                              </button>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+
+                  {bookingDate && bookingTime && (
+                    <p className="text-sm text-muted-foreground">
+                      Review: {reschedulingId !== null ? "Change pickup to" : "Book pickup for"}{" "}
+                      {new Date(`${bookingDate}T${bookingTime}`).toLocaleString()}
+                    </p>
+                  )}
+
+<Button
                     className="mt-5"
                     onClick={bookPickup}
-                    disabled={appointmentBusy || availablePackages.length === 0}
+                    disabled={appointmentBusy || (reschedulingId === null && availablePackages.length === 0)}
                   >
-                    {appointmentBusy ? "Saving..." : "Confirm Pickup"}
+                    {appointmentBusy ? "Saving..." : reschedulingId !== null ? "Confirm Reschedule" : "Confirm Pickup"}
                   </Button>
 
-                  {availablePackages.length === 0 && (
+                  {reschedulingId !== null && (
+                    <Button
+                      className="mt-3 ml-3"
+                      variant="outline"
+                      onClick={() => {
+                        setReschedulingId(null);
+                        setBookingPackageId("");
+                        setAppointmentError("");
+                      }}
+                    >
+                      Cancel Rescheduling
+                    </Button>
+                  )}
+
+                  {reschedulingId === null && availablePackages.length === 0 && (
                     <p className="mt-3 text-sm text-muted-foreground">
                       You have no available packages to schedule.
                     </p>

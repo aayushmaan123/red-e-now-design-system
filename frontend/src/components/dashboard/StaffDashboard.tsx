@@ -29,6 +29,12 @@ import {
 
 import { getResidents, type ResidentOption } from "@/api/residentsApi";
 import { getAppointments, type PickupAppointment } from "@/api/appointmentsApi";
+import {
+  getSchedulingSettings,
+  updateSchedulingSettings,
+  type SchedulingSettings,
+} from "@/api/schedulingApi";
+
 
 /* ── Sidebar nav items ── */
 const items = [
@@ -36,8 +42,9 @@ const items = [
   { label: "Register Package", icon: PackagePlus },
   { label: "Packages", icon: Package },
   { label: "Today's Pickups", icon: CalendarDays },
+  { label: "Preparation Queue", icon: Archive },
+  { label: "Pickup Settings", icon: Clock3 },
   { label: "Upcoming", icon: Clock3 },
-  { label: "Preparation Queue", icon: ClipboardList },
   { label: "Residents", icon: UsersRound },
   { label: "History", icon: History },
   { label: "Account", icon: UserRound },
@@ -161,6 +168,52 @@ export function StaffDashboard() {
     fetchAppointments();
   }, [fetchAppointments, section]);
 
+  /* Sprint 3 — building pickup configuration */
+  const [schedulingSettings, setSchedulingSettings] =
+    useState<SchedulingSettings | null>(null);
+  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState("");
+
+  useEffect(() => {
+    getSchedulingSettings()
+      .then(setSchedulingSettings)
+      .catch((error: unknown) => {
+        setSettingsMessage(
+          error instanceof Error
+            ? error.message
+            : "Could not load scheduling settings."
+        );
+      });
+  }, []);
+
+  const saveSchedulingSettings = async () => {
+    if (!schedulingSettings) return;
+
+    setSettingsBusy(true);
+    setSettingsMessage("");
+
+    try {
+      await updateSchedulingSettings({
+        open_time: schedulingSettings.open_time,
+        close_time: schedulingSettings.close_time,
+        slot_minutes: schedulingSettings.slot_minutes,
+        default_capacity: schedulingSettings.default_capacity,
+        cancellation_cutoff_minutes:
+          schedulingSettings.cancellation_cutoff_minutes,
+      });
+      setSettingsMessage("Scheduling settings saved.");
+      await fetchAppointments();
+    } catch (error) {
+      setSettingsMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not save scheduling settings."
+      );
+    } finally {
+      setSettingsBusy(false);
+    }
+  };
+
   const todayKey = new Date().toLocaleDateString("en-CA");
 
   const activeAppointments = appointments.filter(
@@ -236,6 +289,21 @@ export function StaffDashboard() {
   }, [drawerPkg]);
 
   /* ── Sorted packages ── */
+  // Keep operational queues synchronized with resident changes.
+  useEffect(() => {
+    if (!["Today's Pickups", "Upcoming", "Preparation Queue"].includes(section)) {
+      return;
+    }
+
+    const refresh = () => {
+      void fetchAppointments();
+      void fetchPackages();
+    };
+
+    const interval = window.setInterval(refresh, 15000);
+    return () => window.clearInterval(interval);
+  }, [section, fetchAppointments, fetchPackages]);
+
   const sortedPackages = [...packages].sort((a, b) => {
     if (!sortKey) return 0;
     const key = sortKey as keyof PackageRecord;
@@ -639,6 +707,164 @@ export function StaffDashboard() {
 
 
         /* ═══════ SPRINT 3 PICKUP SCHEDULE ═══════ */
+        ) : section === "Pickup Settings" ? (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold">Pickup Scheduling Settings</h2>
+            <p className="text-sm text-muted-foreground">
+              Configure pickup hours and capacity for the current building.
+            </p>
+
+            {schedulingSettings ? (
+              <Card className="space-y-5 p-5">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {([
+                    ["open_time", "Opening time"],
+                    ["close_time", "Closing time"],
+                  ] as const).map(([field, label]) => (
+                    <label key={field} className="space-y-2 text-sm">
+                      <span className="block font-medium">{label}</span>
+                      <input
+                        type="time"
+                        value={schedulingSettings[field]}
+                        onChange={(event) =>
+                          setSchedulingSettings({
+                            ...schedulingSettings,
+                            [field]: event.target.value,
+                          })
+                        }
+                        className="min-h-11 w-full rounded-lg border border-border bg-background px-3"
+                      />
+                    </label>
+                  ))}
+
+                  <label className="space-y-2 text-sm">
+                    <span className="block font-medium">Slot duration</span>
+                    <select
+                      value={schedulingSettings.slot_minutes}
+                      onChange={(event) =>
+                        setSchedulingSettings({
+                          ...schedulingSettings,
+                          slot_minutes: Number(event.target.value),
+                        })
+                      }
+                      className="min-h-11 w-full rounded-lg border border-border bg-background px-3"
+                    >
+                      <option value={15}>15 minutes</option>
+                      <option value={30}>30 minutes</option>
+                      <option value={60}>60 minutes</option>
+                    </select>
+                  </label>
+
+                  <label className="space-y-2 text-sm">
+                    <span className="block font-medium">Default slot capacity</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={schedulingSettings.default_capacity}
+                      onChange={(event) =>
+                        setSchedulingSettings({
+                          ...schedulingSettings,
+                          default_capacity: Number(event.target.value),
+                        })
+                      }
+                      className="min-h-11 w-full rounded-lg border border-border bg-background px-3"
+                    />
+                  </label>
+
+                  <label className="space-y-2 text-sm sm:col-span-2">
+                    <span className="block font-medium">
+                      Cancellation cutoff (minutes before pickup)
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10080}
+                      value={schedulingSettings.cancellation_cutoff_minutes}
+                      onChange={(event) =>
+                        setSchedulingSettings({
+                          ...schedulingSettings,
+                          cancellation_cutoff_minutes: Number(event.target.value),
+                        })
+                      }
+                      className="min-h-11 w-full rounded-lg border border-border bg-background px-3"
+                    />
+                  </label>
+                </div>
+
+                <Button
+                  onClick={saveSchedulingSettings}
+                  disabled={settingsBusy}
+                >
+                  {settingsBusy ? "Saving..." : "Save Scheduling Settings"}
+                </Button>
+              </Card>
+            ) : (
+              <p>Loading scheduling settings...</p>
+            )}
+
+            {settingsMessage && (
+              <p role="status" className="text-sm">{settingsMessage}</p>
+            )}
+          </div>
+        ) : section === "Preparation Queue" ? (
+          <div className="space-y-5">
+            <h2 className="text-2xl font-semibold">Preparation Queue</h2>
+            <p className="text-sm text-muted-foreground">
+              Scheduled packages awaiting preparation, ordered by pickup time.
+            </p>
+
+            {activeAppointments
+              .filter((appointment) => appointment.package_status === "scheduled")
+              .map((appointment) => (
+                <Card key={appointment.id} className="space-y-3 p-5">
+                  <div className="font-semibold">
+                    {appointment.resident_name} — Unit{" "}
+                    {appointment.resident_unit || "Not assigned"}
+                  </div>
+                  <div className="text-sm">
+                    {appointment.carrier_name} — {appointment.tracking_code}
+                  </div>
+                  <div className="text-sm">
+                    Pickup: {new Date(appointment.pickup_start).toLocaleString()}
+                  </div>
+                  <div className="text-sm">
+                    Storage location: {appointment.location_code || "Not assigned"}
+                  </div>
+                  <Button
+                    onClick={async () => {
+                      try {
+                        await updatePackage(appointment.package_id, {
+                          status: "prepared",
+                        });
+                        await Promise.all([
+                          fetchAppointments(),
+                          fetchPackages(),
+                        ]);
+                      } catch (error) {
+                        setAppointmentsError(
+                          error instanceof Error
+                            ? error.message
+                            : "Could not prepare package."
+                        );
+                      }
+                    }}
+                  >
+                    Mark Prepared
+                  </Button>
+                </Card>
+              ))}
+
+            {activeAppointments.filter(
+              (appointment) => appointment.package_status === "scheduled"
+            ).length === 0 && (
+              <Card className="p-5">
+                <p className="text-sm text-muted-foreground">
+                  No packages currently awaiting preparation.
+                </p>
+              </Card>
+            )}
+          </div>
         ) : section === "Today's Pickups" || section === "Upcoming" ? (
           <>
             <div className="mb-7 animate-fade-in-up">

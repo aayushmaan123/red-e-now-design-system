@@ -11,6 +11,7 @@ from routes.auth import auth_bp
 from routes.packages import packages_bp
 from routes.residents import residents_bp
 from routes.appointments import appointments_bp
+from routes.scheduling import scheduling_bp
 
 
 # Grab our local settings from the .env file.
@@ -58,6 +59,7 @@ def create_app():
     app.register_blueprint(packages_bp)
     app.register_blueprint(residents_bp)
     app.register_blueprint(appointments_bp)
+    app.register_blueprint(scheduling_bp)
 
     # A quick way to check that the backend is running.
     @app.route("/api/health", methods=["GET"])

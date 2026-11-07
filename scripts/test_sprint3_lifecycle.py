@@ -88,12 +88,57 @@ def main():
         slot = next_weekday().strftime("%Y-%m-%dT%H:%M")
         print(f"\nTest pickup slot: {slot}")
 
-        # Test Jane's available package #8.
+        # Register a fresh package for each lifecycle test run.
+        import uuid
+
+        status, payload = api(
+            "GET", "/api/packages", staff
+        )
+        if status != 200:
+            raise RuntimeError(
+                f"Cannot load packages: HTTP {status}"
+            )
+
+        # Jane Doe's resident ID, confirmed in the database.
+        resident_id = 2
+
+        tracking = "SPRINT3-LIFECYCLE-" + uuid.uuid4().hex[:12]
+
+        status, payload = api(
+            "POST", "/api/packages", staff,
+            {
+                "carrier_name": "Sprint 3 Test",
+                "tracking_code": tracking,
+                "resident_id": resident_id,
+                "description": "Automated lifecycle acceptance test",
+                "location_code": "TEST-QUEUE",
+            }
+        )
+        check("Staff registers test package", status, 201)
+
+        if status != 201:
+            raise RuntimeError(
+                f"Cannot register test package: HTTP {status}"
+            )
+
+        package_id = payload["package"]["id"]
+
+        status, _ = api(
+            "PUT", f"/api/packages/{package_id}", staff,
+            {"status": "available"}
+        )
+        check("Staff makes package available", status, 200)
+
+        if status != 200:
+            raise RuntimeError(
+                "Cannot make test package available."
+            )
+
         status, payload = api(
             "POST", "/api/appointments", jane,
-            {"package_id": 8, "pickup_start": slot}
+            {"package_id": package_id, "pickup_start": slot}
         )
-        check("Jane books package #8", status, 201)
+        check("Jane books fresh test package", status, 201)
         if status != 201:
             raise RuntimeError("Cannot continue without initial booking")
 
@@ -102,7 +147,7 @@ def main():
         # Duplicate booking must be rejected.
         status, _ = api(
             "POST", "/api/appointments", jane,
-            {"package_id": 8, "pickup_start": slot}
+            {"package_id": package_id, "pickup_start": slot}
         )
         check("Duplicate booking rejected", status, 409)
 
@@ -125,15 +170,15 @@ def main():
         # Rebook the same package.
         status, payload = api(
             "POST", "/api/appointments", jane,
-            {"package_id": 8, "pickup_start": slot}
+            {"package_id": package_id, "pickup_start": slot}
         )
-        check("Jane rebooks package #8", status, 201)
+        check("Jane rebooks test package", status, 201)
         if status != 201:
             raise RuntimeError("Cannot continue without rebooking")
 
         # Staff prepares the package.
         status, _ = api(
-            "PUT", "/api/packages/8", staff,
+            "PUT", f"/api/packages/{package_id}", staff,
             {"status": "prepared"}
         )
         check("Staff prepares package", status, 200)
@@ -149,7 +194,7 @@ def main():
 
         # Staff confirms pickup.
         status, _ = api(
-            "PUT", "/api/packages/8", staff,
+            "PUT", f"/api/packages/{package_id}", staff,
             {"status": "picked_up"}
         )
         check("Staff completes pickup", status, 200)

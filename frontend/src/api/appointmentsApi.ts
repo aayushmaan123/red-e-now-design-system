@@ -14,6 +14,8 @@ export interface PickupAppointment {
   carrier_name?: string;
   resident_name?: string;
   resident_unit?: string;
+  location_code?: string;
+  package_status?: string;
 }
 
 interface AppointmentListResponse {
@@ -53,4 +55,20 @@ export async function cancelAppointment(
     `/appointments/${appointmentId}/cancel`,
     { method: "POST" },
   );
+}
+
+
+export async function rescheduleAppointment(
+  appointmentId: number,
+  pickupStart: string,
+): Promise<PickupAppointment> {
+  const response = await api<AppointmentResponse>(
+    `/appointments/${appointmentId}/reschedule`,
+    {
+      method: "POST",
+      body: JSON.stringify({ pickup_start: pickupStart }),
+    },
+  );
+
+  return response.appointment;
 }

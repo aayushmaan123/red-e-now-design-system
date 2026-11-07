@@ -133,7 +133,10 @@ export function TabBar({ items, activeTab, onTabChange, className }: { items: re
     else if (e.key === "ArrowLeft") next = (idx - 1 + items.length) % items.length;
     else return;
     e.preventDefault();
-    onTabChange(items[next].name);
+    // Only switch tabs if we found a valid one.
+    const nextItem = items[next];
+    if (!nextItem) return;
+    onTabChange(nextItem.name);
     (e.currentTarget.parentElement?.children[next] as HTMLElement)?.focus();
   };
 
@@ -168,7 +171,7 @@ export function PackageCard({ carrierName, trackingCode, status, arrivedAt, desc
   carrierName: string; trackingCode?: string; status: "received" | "available" | "scheduled" | "prepared" | "picked_up";
   arrivedAt: string; description?: string; recipientName?: string; recipientUnit?: string; onClick?: () => void; className?: string;
 }) {
-  return <Card hover={!!onClick} onClick={onClick} {...(className ? { className } : {})}>
+  return <Card hover={!!onClick} {...(onClick ? { onClick } : {})} {...(className ? { className } : {})}>
     <div className="p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
@@ -197,7 +200,7 @@ export function AppointmentCard({ date, timeSlot, packageCount, status, resident
   date: string; timeSlot: string; packageCount: number; status: "scheduled" | "prepared" | "picked_up";
   residentName?: string; residentUnit?: string; onAction?: () => void; actionLabel?: string; onClick?: () => void; className?: string;
 }) {
-  return <Card hover={!!onClick} onClick={onClick} {...(className ? { className } : {})}>
+  return <Card hover={!!onClick} {...(onClick ? { onClick } : {})} {...(className ? { className } : {})}>
     <div className="p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
