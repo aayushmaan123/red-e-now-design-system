@@ -25,6 +25,18 @@ def serialize(row):
     for key in ("pickup_start", "pickup_end", "created_at"):
         if isinstance(result.get(key), datetime):
             result[key] = result[key].isoformat()
+
+    if row.get("status") == "completed":
+        row["handoff_status"] = "Completed"
+    elif row.get("acknowledged_at") is not None:
+        row["handoff_status"] = "Signed off"
+    elif row.get("identity_verified_at") is not None:
+        row["handoff_status"] = "Identity verified"
+    elif row.get("checked_in_at") is not None:
+        row["handoff_status"] = "Waiting"
+    else:
+        row["handoff_status"] = "Not checked in"
+
     return result
 
 
@@ -32,6 +44,8 @@ def appointment_list(cursor, where="", params=()):
     cursor.execute("""
         SELECT a.id, a.package_id, a.resident_id,
                a.pickup_start, a.pickup_end, a.status, a.created_at,
+            a.checked_in_at, a.identity_verified_at,
+            a.acknowledged_at, a.handed_off_at,
                p.tracking_code, p.carrier_name, p.location_code,
                p.status AS package_status,
                u.name AS resident_name, u.unit AS resident_unit

@@ -7,6 +7,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 
 # Bring in all the routes our backend uses.
+from routes.handoff import handoff_bp
 from routes.auth import auth_bp
 from routes.packages import packages_bp
 from routes.residents import residents_bp
@@ -59,6 +60,7 @@ def create_app():
     app.register_blueprint(packages_bp)
     app.register_blueprint(residents_bp)
     app.register_blueprint(appointments_bp)
+    app.register_blueprint(handoff_bp)
     app.register_blueprint(scheduling_bp)
 
     # A quick way to check that the backend is running.

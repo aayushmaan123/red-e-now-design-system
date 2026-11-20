@@ -458,6 +458,16 @@ def update_package(package_id):
             old_status = existing["status"]
             new_status = updates["status"]
 
+            # Sprint 4: completing pickup requires the verified
+            # handoff workflow, not a generic package update.
+            if new_status == "picked_up" and old_status != "picked_up":
+                connection.rollback()
+                return error_response(
+                    "HANDOFF_REQUIRED",
+                    "Complete pickup through the verified handoff workflow.",
+                    409,
+                )
+
             if (
                 new_status != old_status
                 and new_status not in ALLOWED_TRANSITIONS[old_status]
@@ -481,10 +491,9 @@ def update_package(package_id):
                 409,
             )
 
-        # Staff may prepare or complete only packages with a real
-        # active appointment. This prevents orphaned status changes.
+        # Staff may prepare only packages with an active appointment.
         if (
-            updates.get("status") in ("prepared", "picked_up")
+            updates.get("status") == "prepared"
             and updates["status"] != existing["status"]
         ):
             cursor.execute(
@@ -559,19 +568,6 @@ def update_package(package_id):
                 action,
                 changed_old,
                 changed_new,
-            )
-
-        # Sprint 3: completing a pickup must also complete its appointment.
-        # This runs before commit, so both changes succeed or roll back together.
-        if changed_new.get("status") == "picked_up":
-            cursor.execute(
-                """
-                UPDATE pickup_appointments
-                SET status = 'completed'
-                WHERE package_id = %s
-                  AND status = 'scheduled'
-                """,
-                (package_id,),
             )
 
         connection.commit()
