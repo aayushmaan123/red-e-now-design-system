@@ -6,18 +6,24 @@
  *  - "Packages" section → Table with search, status filter, row-click Drawer detail
  *  - Dashboard stat cards wired to live package counts
  *
- * All other sections remain placeholder (Today's Pickups, Upcoming, etc.).
+ * Sprint 4 (Handoff) additions:
+ *  - Preparation Queue sorted by soonest pickup, with urgency and storage location
+ *  - Verified handoff: residents check in from their app, then staff verify
+ *    identity, record the recipient sign-off and complete the pickup
+ *  - Handoff progress on Today's Pickups and the "Handoff" section
+ *  - Completion receipts in Handoff and History ("Completed Today")
  */
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  Archive, CalendarDays, CheckCheck, ChevronRight, ClipboardList, Clock3,
-  History, House, LogOut, Menu, Moon, Package, PackagePlus, Search, Sun,
+  AlertTriangle, Archive, CalendarDays, CheckCheck, ChevronRight, ClipboardList,
+  Clock3, Handshake, History, House, LogOut, MapPin, Menu, Moon, Package,
+  PackagePlus, PenLine, Receipt, Search, ShieldCheck, Sun, Timer, UserCheck,
   UserRound, UsersRound, X,
 } from "lucide-react";
 import {
   Avatar, Button, Card, EmptyState, Modal, TextInput, StatusBadge,
-  Table, Drawer, SearchField, type Column,
+  Table, Drawer, SearchField, ConfirmPrompt, type Column,
 } from "@/components/common";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
@@ -29,6 +35,9 @@ import {
 
 import { getResidents, type ResidentOption } from "@/api/residentsApi";
 import { getAppointments, type PickupAppointment } from "@/api/appointmentsApi";
+import {
+  completeHandoff, signoff, verifyIdentity, type HandoffResponse,
+} from "@/api/handoffApi";
 import {
   getSchedulingSettings,
   updateSchedulingSettings,
@@ -43,6 +52,7 @@ const items = [
   { label: "Packages", icon: Package },
   { label: "Today's Pickups", icon: CalendarDays },
   { label: "Preparation Queue", icon: Archive },
+  { label: "Handoff", icon: Handshake },
   { label: "Pickup Settings", icon: Clock3 },
   { label: "Upcoming", icon: Clock3 },
   { label: "Residents", icon: UsersRound },
@@ -95,8 +105,166 @@ const pkgColumns: Column<PackageRecord>[] = [
 const NEXT_STATUS: Partial<Record<PackageStatus, { label: string; next: PackageStatus }>> = {
   received: { label: "Mark Available", next: "available" },
   scheduled: { label: "Mark Prepared", next: "prepared" },
-  prepared: { label: "Confirm Pickup", next: "picked_up" },
+  // prepared → picked_up now goes through the verified handoff workflow.
 };
+
+/* ── Sprint 4: verified handoff helpers ── */
+
+type HandoffStage =
+  | "Not checked in"
+  | "Waiting"
+  | "Identity verified"
+  | "Signed off"
+  | "Completed";
+
+/** Where an appointment is in the 4-step handoff, as reported by the backend. */
+function handoffStage(appointment: PickupAppointment): HandoffStage {
+  if (appointment.handoff_status) {
+    return appointment.handoff_status as HandoffStage;
+  }
+  // Fall back to the step timestamps if the status label is missing.
+  if (appointment.status === "completed") return "Completed";
+  if (appointment.acknowledged_at) return "Signed off";
+  if (appointment.identity_verified_at) return "Identity verified";
+  if (appointment.checked_in_at) return "Waiting";
+  return "Not checked in";
+}
+
+const HANDOFF_TONES: Record<HandoffStage, string> = {
+  "Not checked in": "bg-muted text-muted-foreground",
+  Waiting: "bg-warning/15 text-warning-foreground",
+  "Identity verified": "bg-info/10 text-info",
+  "Signed off": "bg-primary/10 text-primary",
+  Completed: "bg-success/10 text-success",
+};
+
+function HandoffBadge({ stage }: { stage: HandoffStage }) {
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${HANDOFF_TONES[stage]}`}>
+      <UserCheck size={12} strokeWidth={2} />
+      {stage}
+    </span>
+  );
+}
+
+function ExceptionBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
+      <AlertTriangle size={12} strokeWidth={2} />
+      Package exception
+    </span>
+  );
+}
+
+const isFlagged = (flag: boolean | number | undefined) => flag === true || flag === 1;
+
+const formatTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+const formatDuration = (minutes: number) => {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h > 0 ? `${h}h${m ? ` ${m}m` : ""}` : `${m}m`;
+};
+
+/** How soon the resident is coming, with a tone for the urgency chip. */
+function pickupUrgency(
+  appointment: PickupAppointment,
+  now: number,
+): { label: string; tone: string } {
+  const start = new Date(appointment.pickup_start).getTime();
+  const end = new Date(appointment.pickup_end).getTime();
+  const minutes = Math.round((start - now) / 60000);
+
+  if (now > end) {
+    return {
+      label: `Overdue · ${formatDuration(Math.round((now - end) / 60000))}`,
+      tone: "bg-destructive/10 text-destructive",
+    };
+  }
+  if (now >= start) {
+    return { label: "Arriving now", tone: "bg-destructive/10 text-destructive" };
+  }
+  if (minutes <= 30) {
+    return { label: `Due in ${formatDuration(minutes)}`, tone: "bg-destructive/10 text-destructive" };
+  }
+  if (minutes <= 120) {
+    return { label: `Due in ${formatDuration(minutes)}`, tone: "bg-warning/15 text-warning-foreground" };
+  }
+  if (appointment.pickup_start.slice(0, 10) === new Date(now).toLocaleDateString("en-CA")) {
+    return { label: `Later today · ${formatTime(appointment.pickup_start)}`, tone: "bg-info/10 text-info" };
+  }
+  return {
+    label: new Date(appointment.pickup_start).toLocaleDateString([], {
+      weekday: "short", month: "short", day: "numeric",
+    }),
+    tone: "bg-muted text-muted-foreground",
+  };
+}
+
+interface HandoffReceipt {
+  appointmentId: number;
+  residentName: string;
+  residentUnit: string;
+  carrierName: string;
+  trackingCode: string;
+  locationCode: string;
+  completedAt: string | null;
+  completedBy: string | null;
+}
+
+const toReceipt = (
+  appointment: PickupAppointment,
+  completedAt: string | null,
+  completedBy: string | null,
+): HandoffReceipt => ({
+  appointmentId: appointment.id,
+  residentName: appointment.resident_name || "Resident",
+  residentUnit: appointment.resident_unit || "Not assigned",
+  carrierName: appointment.carrier_name || "Unknown carrier",
+  trackingCode: appointment.tracking_code || "—",
+  locationCode: appointment.location_code || "Not assigned",
+  completedAt,
+  completedBy,
+});
+
+/** Summary card shown after a pickup is confirmed. */
+function ReceiptCard({ receipt, highlight = false }: { receipt: HandoffReceipt; highlight?: boolean }) {
+  return (
+    <Card className={`p-5 ${highlight ? "border-success/40 animate-float-up" : ""}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
+            <Receipt size={18} strokeWidth={1.8} />
+          </div>
+          <div>
+            <p className="font-medium">{receipt.residentName}</p>
+            <p className="text-sm text-muted-foreground">Unit {receipt.residentUnit}</p>
+          </div>
+        </div>
+        <StatusBadge status="picked_up" />
+      </div>
+      <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Package</dt>
+          <dd className="mt-1">{receipt.carrierName}</dd>
+          <dd className="font-mono text-xs text-muted-foreground break-all">{receipt.trackingCode}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Picked up</dt>
+          <dd className="mt-1">{receipt.completedAt ? formatTime(receipt.completedAt) : "Today"}</dd>
+          {receipt.completedBy && (
+            <dd className="text-xs text-muted-foreground">by {receipt.completedBy}</dd>
+          )}
+        </div>
+        <div className="col-span-2">
+          <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">From location</dt>
+          <dd className="mt-1 font-mono">{receipt.locationCode}</dd>
+        </div>
+      </dl>
+    </Card>
+  );
+}
 
 export function StaffDashboard() {
   const { user, signOut } = useAuth();
@@ -224,6 +392,279 @@ export function StaffDashboard() {
     (appointment) => appointment.pickup_start.slice(0, 10) === todayKey
   );
 
+  /* Sprint 4 — preparation urgency and verified handoff */
+  // Urgency labels refresh with the 15-second queue polling below.
+  const now = Date.now();
+
+  const [handoffTarget, setHandoffTarget] = useState<PickupAppointment | null>(null);
+  const [handoffBusyId, setHandoffBusyId] = useState<number | null>(null);
+  const [handoffError, setHandoffError] = useState("");
+  // Inline sign-off form, open for one appointment at a time.
+  const [signoffId, setSignoffId] = useState<number | null>(null);
+  const [signoffName, setSignoffName] = useState("");
+  const [signoffAck, setSignoffAck] = useState(false);
+  const [signoffNote, setSignoffNote] = useState("");
+  const [lastReceipt, setLastReceipt] = useState<HandoffReceipt | null>(null);
+  const [prepBusyId, setPrepBusyId] = useState<number | null>(null);
+  // Completion time + staff name, read from each package's audit trail.
+  const [completionInfo, setCompletionInfo] =
+    useState<Record<number, { at: string; by: string }>>({});
+
+  const byPickupTime = (a: PickupAppointment, b: PickupAppointment) =>
+    new Date(a.pickup_start).getTime() - new Date(b.pickup_start).getTime();
+
+  const prepQueue = activeAppointments
+    .filter((appointment) => appointment.package_status === "scheduled")
+    .sort(byPickupTime);
+
+  // Residents who have checked in and are mid-handoff, earliest arrival first.
+  const checkedInAppointments = activeAppointments
+    .filter((a) => a.package_status === "prepared" && handoffStage(a) !== "Not checked in")
+    .sort((a, b) =>
+      new Date(a.checked_in_at ?? a.pickup_start).getTime() -
+      new Date(b.checked_in_at ?? b.pickup_start).getTime()
+    );
+
+  // Today's Pickups also lists today's finished handoffs as receipts.
+  const todaysPickups = appointments
+    .filter(
+      (a) =>
+        (a.status === "scheduled" || a.status === "completed") &&
+        a.pickup_start.slice(0, 10) === todayKey
+    )
+    .sort(byPickupTime);
+
+  const packageExceptions = new Set(
+    packages.filter((p) => isFlagged(p.has_exception)).map((p) => p.id)
+  );
+  const hasException = (appointment: PickupAppointment) =>
+    isFlagged(appointment.has_exception) || packageExceptions.has(appointment.package_id);
+
+  const completedToday = appointments
+    .filter((a) => a.status === "completed")
+    .filter((a) => {
+      const at = completionInfo[a.id]?.at ?? a.handed_off_at;
+      return at
+        ? new Date(at).toLocaleDateString("en-CA") === todayKey
+        : a.pickup_start.slice(0, 10) === todayKey;
+    })
+    .sort((a, b) =>
+      (completionInfo[b.id]?.at ?? b.pickup_start).localeCompare(
+        completionInfo[a.id]?.at ?? a.pickup_start
+      )
+    );
+
+  // Look up when (and by whom) each of today's pickups was confirmed.
+  useEffect(() => {
+    if (!["Handoff", "History", "Dashboard"].includes(section)) return;
+    const missing = appointments.filter(
+      (a) =>
+        a.status === "completed" &&
+        a.pickup_start.slice(0, 10) === todayKey &&
+        !completionInfo[a.id]
+    );
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    Promise.all(
+      missing.map(async (a) => {
+        const audit = await getPackageAudit(a.package_id).catch(() => []);
+        const entry = audit.find((e) => e.new_values?.["status"] === "picked_up");
+        return entry
+          ? ([a.id, { at: entry.changed_at, by: entry.changed_by_name }] as const)
+          : null;
+      })
+    ).then((results) => {
+      if (cancelled) return;
+      const found = results.filter((r) => r !== null);
+      if (found.length === 0) return;
+      setCompletionInfo((current) => ({ ...current, ...Object.fromEntries(found) }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [section, appointments]);
+
+  const handlePrepare = async (appointment: PickupAppointment) => {
+    setPrepBusyId(appointment.id);
+    setAppointmentsError("");
+    try {
+      await updatePackage(appointment.package_id, { status: "prepared" });
+      await Promise.all([fetchAppointments(), fetchPackages()]);
+    } catch (error) {
+      setAppointmentsError(
+        error instanceof Error ? error.message : "Could not prepare package."
+      );
+    } finally {
+      setPrepBusyId(null);
+    }
+  };
+
+  /** Run one handoff step, then reload so every card shows the new stage. */
+  const runHandoffStep = async (
+    appointment: PickupAppointment,
+    step: () => Promise<HandoffResponse>,
+    fallbackMessage: string,
+  ): Promise<HandoffResponse | null> => {
+    setHandoffBusyId(appointment.id);
+    setHandoffError("");
+    try {
+      const result = await step();
+      await Promise.all([fetchAppointments(), fetchPackages()]);
+      return result;
+    } catch (error) {
+      setHandoffError(error instanceof Error ? error.message : fallbackMessage);
+      return null;
+    } finally {
+      setHandoffBusyId(null);
+    }
+  };
+
+  const handleVerifyIdentity = (appointment: PickupAppointment) =>
+    runHandoffStep(
+      appointment,
+      () => verifyIdentity(appointment.id),
+      "Could not verify identity."
+    );
+
+  const openSignoff = (appointment: PickupAppointment) => {
+    setSignoffId(appointment.id);
+    setSignoffName(appointment.resident_name || "");
+    setSignoffAck(false);
+    setSignoffNote("");
+    setHandoffError("");
+  };
+
+  const handleSignoff = async (e: React.FormEvent, appointment: PickupAppointment) => {
+    e.preventDefault();
+    const recipientName = signoffName.trim();
+    if (!recipientName) {
+      setHandoffError("Recipient name is required.");
+      return;
+    }
+    if (!signoffAck) {
+      setHandoffError("The recipient must acknowledge receipt.");
+      return;
+    }
+    const result = await runHandoffStep(
+      appointment,
+      () => signoff(appointment.id, recipientName, signoffNote.trim() || undefined),
+      "Could not record sign-off."
+    );
+    if (result) setSignoffId(null);
+  };
+
+  const handleCompleteHandoff = async () => {
+    if (!handoffTarget) return;
+    const appointment = handoffTarget;
+    const result = await runHandoffStep(
+      appointment,
+      () => completeHandoff(appointment.id),
+      "Could not complete pickup."
+    );
+    if (result) {
+      const completedBy = user?.name || "Staff";
+      setCompletionInfo((current) => ({
+        ...current,
+        [appointment.id]: { at: result.timestamp, by: completedBy },
+      }));
+      setLastReceipt(toReceipt(appointment, result.timestamp, completedBy));
+    }
+    setHandoffTarget(null);
+  };
+
+  /** The next handoff action for an appointment, based on its current stage. */
+  const renderHandoffActions = (appointment: PickupAppointment) => {
+    const stage = handoffStage(appointment);
+    const busy = handoffBusyId === appointment.id;
+
+    if (stage === "Completed") return null;
+
+    if (hasException(appointment)) {
+      return (
+        <p className="text-sm text-destructive">
+          Resolve the package exception before continuing the handoff.
+        </p>
+      );
+    }
+
+    if (appointment.package_status !== "prepared") {
+      return <p className="text-sm text-muted-foreground">Prepare the package before handoff.</p>;
+    }
+
+    if (stage === "Not checked in") {
+      return (
+        <p className="text-sm text-muted-foreground">
+          Waiting for the resident to check in when they arrive.
+        </p>
+      );
+    }
+
+    if (stage === "Waiting") {
+      return (
+        <Button onClick={() => handleVerifyIdentity(appointment)} disabled={busy} className="gap-2">
+          <ShieldCheck size={16} /> {busy ? "Verifying…" : "Verify Identity"}
+        </Button>
+      );
+    }
+
+    if (stage === "Identity verified") {
+      if (signoffId !== appointment.id) {
+        return (
+          <Button onClick={() => openSignoff(appointment)} className="gap-2">
+            <PenLine size={16} /> Sign Off
+          </Button>
+        );
+      }
+      return (
+        <form onSubmit={(e) => handleSignoff(e, appointment)} className="space-y-4">
+          <TextInput
+            label="Recipient name"
+            value={signoffName}
+            onChange={(e) => setSignoffName(e.target.value)}
+            maxLength={150}
+            required
+          />
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={signoffAck}
+              onChange={(e) => setSignoffAck(e.target.checked)}
+              className="mt-0.5 size-4 accent-primary"
+            />
+            <span>The recipient acknowledges receiving this package.</span>
+          </label>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">
+              Note <span className="font-normal text-muted-foreground">(optional)</span>
+            </label>
+            <textarea
+              value={signoffNote}
+              onChange={(e) => setSignoffNote(e.target.value)}
+              maxLength={255}
+              rows={2}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={busy || !signoffAck || !signoffName.trim()}>
+              {busy ? "Saving…" : "Record Sign-off"}
+            </Button>
+            <Button type="button" variant="secondary" disabled={busy} onClick={() => setSignoffId(null)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      );
+    }
+
+    return (
+      <Button onClick={() => setHandoffTarget(appointment)} disabled={busy} className="gap-2">
+        <CheckCheck size={16} /> Complete Pickup
+      </Button>
+    );
+  };
+
   /* ── Fetch packages ── */
   const fetchPackages = useCallback(async () => {
     setLoading(true);
@@ -291,7 +732,7 @@ export function StaffDashboard() {
   /* ── Sorted packages ── */
   // Keep operational queues synchronized with resident changes.
   useEffect(() => {
-    if (!["Today's Pickups", "Upcoming", "Preparation Queue"].includes(section)) {
+    if (!["Today's Pickups", "Upcoming", "Preparation Queue", "Handoff", "History"].includes(section)) {
       return;
     }
 
@@ -524,7 +965,9 @@ export function StaffDashboard() {
                   <div className="font-display text-[35px] font-semibold leading-none">
                     {s.label === "Today's Pickups"
                       ? todaysAppointments.length
-                      : packages.filter(s.filter).length}
+                      : s.label === "Completed Today"
+                        ? completedToday.length
+                        : packages.filter(s.filter).length}
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground sm:text-sm">{s.label}</p>
                 </Card>
@@ -807,72 +1250,89 @@ export function StaffDashboard() {
               <p role="status" className="text-sm">{settingsMessage}</p>
             )}
           </div>
+        /* ═══════ PREPARATION QUEUE ═══════ */
         ) : section === "Preparation Queue" ? (
-          <div className="space-y-5">
-            <h2 className="text-2xl font-semibold">Preparation Queue</h2>
-            <p className="text-sm text-muted-foreground">
-              Scheduled packages awaiting preparation, ordered by pickup time.
-            </p>
+          <>
+            <div className="mb-7 animate-fade-in-up">
+              <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Oakwood Residences / Management</p>
+              <h1 className="font-display text-[38px] font-semibold uppercase leading-none">Preparation Queue</h1>
+              <p className="mt-3 text-sm text-muted-foreground">
+                {prepQueue.length} package{prepQueue.length !== 1 ? "s" : ""} to pull — soonest pickup first.
+              </p>
+            </div>
 
-            {activeAppointments
-              .filter((appointment) => appointment.package_status === "scheduled")
-              .map((appointment) => (
-                <Card key={appointment.id} className="space-y-3 p-5">
-                  <div className="font-semibold">
-                    {appointment.resident_name} — Unit{" "}
-                    {appointment.resident_unit || "Not assigned"}
-                  </div>
-                  <div className="text-sm">
-                    {appointment.carrier_name} — {appointment.tracking_code}
-                  </div>
-                  <div className="text-sm">
-                    Pickup: {new Date(appointment.pickup_start).toLocaleString()}
-                  </div>
-                  <div className="text-sm">
-                    Storage location: {appointment.location_code || "Not assigned"}
-                  </div>
-                  <Button
-                    onClick={async () => {
-                      try {
-                        await updatePackage(appointment.package_id, {
-                          status: "prepared",
-                        });
-                        await Promise.all([
-                          fetchAppointments(),
-                          fetchPackages(),
-                        ]);
-                      } catch (error) {
-                        setAppointmentsError(
-                          error instanceof Error
-                            ? error.message
-                            : "Could not prepare package."
-                        );
-                      }
-                    }}
-                  >
-                    Mark Prepared
-                  </Button>
-                </Card>
-              ))}
+            {appointmentsError && (
+              <p role="alert" className="mb-4 text-sm text-destructive">{appointmentsError}</p>
+            )}
 
-            {activeAppointments.filter(
-              (appointment) => appointment.package_status === "scheduled"
-            ).length === 0 && (
-              <Card className="p-5">
-                <p className="text-sm text-muted-foreground">
-                  No packages currently awaiting preparation.
-                </p>
+            <div className="space-y-3">
+              {prepQueue.map((appointment, i) => {
+                const urgency = pickupUrgency(appointment, now);
+                return (
+                  <Card key={appointment.id} className={`p-5 animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                      {/* Storage location — what staff need first to pull the package */}
+                      <div className="flex shrink-0 items-center gap-3 rounded-lg bg-prepared/10 px-4 py-3 text-prepared sm:w-44">
+                        <MapPin size={20} strokeWidth={1.8} />
+                        <div className="min-w-0">
+                          <p className="font-mono text-[10px] uppercase tracking-wider opacity-80">Location</p>
+                          <p className="truncate font-display text-xl font-semibold uppercase leading-tight">
+                            {appointment.location_code || "Unassigned"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${urgency.tone}`}>
+                            <Timer size={12} strokeWidth={2} />
+                            {urgency.label}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatTime(appointment.pickup_start)}–{formatTime(appointment.pickup_end)}
+                          </span>
+                        </div>
+                        <p className="mt-2 font-medium">
+                          {appointment.resident_name}
+                          <span className="ml-1.5 font-normal text-muted-foreground">
+                            · Unit {appointment.resident_unit || "Not assigned"}
+                          </span>
+                        </p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">
+                          {appointment.carrier_name} · <span className="font-mono text-xs">{appointment.tracking_code}</span>
+                        </p>
+                      </div>
+
+                      <Button
+                        onClick={() => handlePrepare(appointment)}
+                        disabled={prepBusyId === appointment.id}
+                        className="sm:shrink-0"
+                      >
+                        {prepBusyId === appointment.id ? "Saving…" : "Mark Prepared"}
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {prepQueue.length === 0 && !appointmentsLoading && (
+              <Card className="animate-fade-in-up stagger-1">
+                <EmptyState icon={Archive} message="No packages currently awaiting preparation." />
               </Card>
             )}
-          </div>
+          </>
+
+        /* ═══════ TODAY'S PICKUPS / UPCOMING ═══════ */
         ) : section === "Today's Pickups" || section === "Upcoming" ? (
           <>
             <div className="mb-7 animate-fade-in-up">
-              <h1 className="font-display text-[38px] font-semibold uppercase">
-                {section}
-              </h1>
+              <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Oakwood Residences / Management</p>
+              <h1 className="font-display text-[38px] font-semibold uppercase leading-none">{section}</h1>
               <p className="mt-3 text-sm text-muted-foreground">
-                Live pickup appointments from MySQL.
+                {section === "Today's Pickups"
+                  ? "Residents check in from their app — verify, sign off and complete each handoff here."
+                  : "Live pickup appointments from MySQL."}
               </p>
             </div>
 
@@ -890,35 +1350,75 @@ export function StaffDashboard() {
                 {appointmentsError}
               </p>
             )}
+            {section === "Today's Pickups" && handoffError && (
+              <p role="alert" className="mb-4 text-sm text-destructive">{handoffError}</p>
+            )}
 
             <div className="space-y-3">
               {(section === "Today's Pickups"
-                ? todaysAppointments
+                ? todaysPickups
                 : activeAppointments.filter(
                     (a) => a.pickup_start.slice(0, 10) >= todayKey
                   )
-              ).map((appointment) => (
-                <Card key={appointment.id} className="p-5">
-                  <p className="text-lg font-semibold">
-                    {appointment.resident_name}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Unit {appointment.resident_unit || "Not assigned"}
-                  </p>
-                  <p className="mt-3 text-sm">
-                    {appointment.carrier_name} — {appointment.tracking_code}
-                  </p>
-                  <p className="mt-2 text-sm font-medium">
-                    {new Date(appointment.pickup_start).toLocaleString()}
-                  </p>
-                  <p className="mt-2 text-xs text-primary">Scheduled</p>
-                </Card>
-              ))}
+              ).map((appointment, i) => {
+                const stage = handoffStage(appointment);
+                if (stage === "Completed") {
+                  return (
+                    <div key={appointment.id} className={`animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}>
+                      <ReceiptCard
+                        receipt={toReceipt(
+                          appointment,
+                          completionInfo[appointment.id]?.at ?? appointment.handed_off_at ?? null,
+                          completionInfo[appointment.id]?.by ?? null
+                        )}
+                      />
+                    </div>
+                  );
+                }
+                return (
+                  <Card key={appointment.id} className={`p-5 animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-lg font-semibold">
+                          {appointment.resident_name}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Unit {appointment.resident_unit || "Not assigned"}
+                        </p>
+                        <p className="mt-3 text-sm">
+                          {appointment.carrier_name} — {appointment.tracking_code}
+                        </p>
+                        <p className="mt-2 text-sm font-medium">
+                          {new Date(appointment.pickup_start).toLocaleString()}
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          {appointment.package_status && (
+                            <StatusBadge status={appointment.package_status as PackageStatus} />
+                          )}
+                          <HandoffBadge stage={stage} />
+                          {hasException(appointment) && <ExceptionBadge />}
+                          {appointment.checked_in_at && (
+                            <span className="text-xs text-muted-foreground">
+                              Checked in {formatTime(appointment.checked_in_at)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {section === "Today's Pickups" && (
+                      <div className="mt-4 border-t border-border pt-4">
+                        {renderHandoffActions(appointment)}
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
             </div>
 
             {!appointmentsLoading &&
               (section === "Today's Pickups"
-                ? todaysAppointments
+                ? todaysPickups
                 : activeAppointments.filter(
                     (a) => a.pickup_start.slice(0, 10) >= todayKey
                   )
@@ -930,6 +1430,151 @@ export function StaffDashboard() {
                   />
                 </Card>
               )}
+          </>
+
+        /* ═══════ HANDOFF ═══════ */
+        ) : section === "Handoff" ? (
+          <>
+            <div className="mb-7 animate-fade-in-up">
+              <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Oakwood Residences / Management</p>
+              <h1 className="font-display text-[38px] font-semibold uppercase leading-none">Handoff</h1>
+              <p className="mt-3 text-sm text-muted-foreground">
+                {checkedInAppointments.length} resident{checkedInAppointments.length !== 1 ? "s" : ""} waiting at the desk.
+              </p>
+            </div>
+
+            {handoffError && (
+              <p role="alert" className="mb-4 text-sm text-destructive">{handoffError}</p>
+            )}
+
+            {lastReceipt && (
+              <section className="mb-8 max-w-xl" aria-live="polite">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="font-display text-[23px] font-semibold uppercase text-success">Pickup Confirmed</h2>
+                  <Button variant="ghost" size="sm" onClick={() => setLastReceipt(null)}>Dismiss</Button>
+                </div>
+                <ReceiptCard receipt={lastReceipt} highlight />
+              </section>
+            )}
+
+            <div className="grid gap-3 lg:grid-cols-2">
+              {checkedInAppointments.map((appointment, i) => (
+                <Card key={appointment.id} className={`p-5 animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar name={appointment.resident_name || "Resident"} />
+                      <div>
+                        <p className="font-medium">{appointment.resident_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Unit {appointment.resident_unit || "Not assigned"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5">
+                      <HandoffBadge stage={handoffStage(appointment)} />
+                      {hasException(appointment) && <ExceptionBadge />}
+                      {appointment.checked_in_at && (
+                        <span className="text-xs text-muted-foreground">
+                          Arrived {formatTime(appointment.checked_in_at)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center gap-3 rounded-lg bg-prepared/10 px-4 py-3 text-prepared">
+                    <MapPin size={20} strokeWidth={1.8} />
+                    <div>
+                      <p className="font-mono text-[10px] uppercase tracking-wider opacity-80">Storage location</p>
+                      <p className="font-display text-xl font-semibold uppercase leading-tight">
+                        {appointment.location_code || "Unassigned"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Carrier</dt>
+                      <dd className="mt-1">{appointment.carrier_name}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Tracking</dt>
+                      <dd className="mt-1 break-all font-mono text-xs">{appointment.tracking_code}</dd>
+                    </div>
+                  </dl>
+
+                  {appointment.recipient_name && (
+                    <p className="mt-3 text-sm">
+                      <span className="text-muted-foreground">Signed for by</span>{" "}
+                      <span className="font-medium">{appointment.recipient_name}</span>
+                    </p>
+                  )}
+
+                  <div className="mt-5 border-t border-border pt-4">
+                    {renderHandoffActions(appointment)}
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            {checkedInAppointments.length === 0 && !appointmentsLoading && (
+              <Card className="animate-fade-in-up stagger-1">
+                <EmptyState
+                  icon={Handshake}
+                  message="No residents checked in yet. Residents check in from their app when they arrive."
+                  action={
+                    <Button variant="secondary" onClick={() => choose("Today's Pickups")}>
+                      Open Today's Pickups
+                    </Button>
+                  }
+                />
+              </Card>
+            )}
+
+            {completedToday.length > 0 && (
+              <section className="mt-10 animate-fade-in-up">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="font-display text-[23px] font-semibold uppercase">Completed Today</h2>
+                  <Button variant="ghost" size="sm" onClick={() => choose("History")}>View all</Button>
+                </div>
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {completedToday.slice(0, 4).map((a) => (
+                    <ReceiptCard
+                      key={a.id}
+                      receipt={toReceipt(a, completionInfo[a.id]?.at ?? null, completionInfo[a.id]?.by ?? null)}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
+
+        /* ═══════ HISTORY (Completed Today) ═══════ */
+        ) : section === "History" ? (
+          <>
+            <div className="mb-7 animate-fade-in-up">
+              <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Oakwood Residences / Management</p>
+              <h1 className="font-display text-[38px] font-semibold uppercase leading-none">History</h1>
+              <p className="mt-3 text-sm text-muted-foreground">
+                {completedToday.length} pickup{completedToday.length !== 1 ? "s" : ""} completed today.
+              </p>
+            </div>
+
+            <h2 className="mb-4 font-display text-[23px] font-semibold uppercase animate-fade-in-up stagger-1">Completed Today</h2>
+            {completedToday.length > 0 ? (
+              <div className="grid gap-3 lg:grid-cols-2">
+                {completedToday.map((a, i) => (
+                  <div key={a.id} className={`animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}>
+                    <ReceiptCard
+                      receipt={toReceipt(a, completionInfo[a.id]?.at ?? null, completionInfo[a.id]?.by ?? null)}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Card className="max-w-3xl animate-fade-in-up stagger-2">
+                <EmptyState icon={History} message="No pickups completed today yet" />
+              </Card>
+            )}
           </>
 
         /* ═══════ ACCOUNT ═══════ */
@@ -977,6 +1622,19 @@ export function StaffDashboard() {
           </>
         )}
       </main>
+
+      {/* ═══════ HANDOFF CONFIRMATION ═══════ */}
+      {handoffTarget && (
+        <ConfirmPrompt
+          title="Complete Pickup"
+          message={`Hand ${handoffTarget.carrier_name} package ${handoffTarget.tracking_code} from ${handoffTarget.location_code || "storage"} to ${handoffTarget.recipient_name || handoffTarget.resident_name} (Unit ${handoffTarget.resident_unit || "—"})? This can't be undone.`}
+          confirmLabel="Complete Pickup"
+          variant="primary"
+          loading={handoffBusyId === handoffTarget.id}
+          onConfirm={handleCompleteHandoff}
+          onCancel={() => { if (handoffBusyId !== handoffTarget.id) setHandoffTarget(null); }}
+        />
+      )}
 
       {/* ═══════ PACKAGE DETAIL DRAWER ═══════ */}
       <Drawer open={!!drawerPkg} onClose={() => setDrawerPkg(null)} title="Package Detail">

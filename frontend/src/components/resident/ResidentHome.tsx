@@ -10,8 +10,8 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { CalendarDays, Clock3, History, House, Moon, Package, Sun, UserRound, LogOut } from "lucide-react";
-import { Avatar, Button, Card, EmptyState, PackageCard, TabBar } from "@/components/common";
+import { CalendarDays, Circle, CircleCheck, Clock3, LogIn, History, House, Moon, Package, Sun, UserRound, LogOut } from "lucide-react";
+import { Avatar, Button, Card, EmptyState, PackageCard, StatusBadge, TabBar } from "@/components/common";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { SparklesCore } from "@/components/ui/sparkles";
@@ -28,7 +28,87 @@ import {
   rescheduleAppointment,
   type PickupAppointment,
 } from "@/api/appointmentsApi";
+import { checkIn } from "@/api/handoffApi";
 
+
+/* Sprint 4 — completed pickup shown as a receipt on the Pickups tab */
+interface PickupReceipt {
+  key: string;
+  carrierName: string;
+  trackingCode: string;
+  description: string;
+  // Booked pickup slot for appointment pickups; arrival date otherwise.
+  pickedUpAt: string | null;
+}
+
+function PickupReceiptCard({ receipt, className }: { receipt: PickupReceipt; className?: string }) {
+  const when = receipt.pickedUpAt ? new Date(receipt.pickedUpAt) : null;
+  return (
+    <Card className={`p-5 ${className ?? ""}`}>
+      <div className="flex items-start gap-4">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-success/10 text-success">
+          <CircleCheck size={22} strokeWidth={1.8} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="font-display text-lg font-semibold uppercase leading-tight">Package Picked Up</h3>
+            <StatusBadge status="picked_up" />
+          </div>
+          <p className="mt-2 text-sm font-medium">{receipt.carrierName}</p>
+          <p className="break-all font-mono text-xs text-muted-foreground">{receipt.trackingCode}</p>
+          {receipt.description && (
+            <p className="mt-1 text-xs text-muted-foreground">{receipt.description}</p>
+          )}
+          <div className="mt-3 flex items-center gap-1.5 text-sm">
+            <Clock3 size={14} className="text-muted-foreground" />
+            {when && !Number.isNaN(when.getTime())
+              ? when.toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+              : "Date unavailable"}
+          </div>
+          <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
+            Thank you for picking up your package. See you next delivery!
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/* Sprint 4 — resident-side progress through the front-desk handoff */
+function formatTime(value: string) {
+  return new Date(value).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function HandoffTracker({ appointment }: { appointment: PickupAppointment }) {
+  const steps = [
+    { label: "Checked in", at: appointment.checked_in_at },
+    { label: "Identity verification", at: appointment.identity_verified_at },
+    { label: "Sign-off", at: appointment.acknowledged_at },
+    { label: "Pickup complete", at: appointment.handed_off_at, done: appointment.status === "completed" },
+  ];
+  return (
+    <ol className="mt-4 space-y-3 border-t border-border pt-4">
+      {steps.map((step) => {
+        const done = step.done ?? Boolean(step.at);
+        return (
+          <li key={step.label} className="flex items-start gap-3">
+            {done ? (
+              <CircleCheck size={18} strokeWidth={1.8} className="mt-0.5 shrink-0 text-success" />
+            ) : (
+              <Circle size={18} strokeWidth={1.8} className="mt-0.5 shrink-0 text-muted-foreground" />
+            )}
+            <div className="min-w-0">
+              <p className={`text-sm font-medium ${done ? "" : "text-muted-foreground"}`}>{step.label}</p>
+              <p className="text-xs text-muted-foreground">
+                {done ? (step.at ? formatTime(step.at) : "Done") : "Pending"}
+              </p>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 /* Bottom navigation tabs */
 const tabs = [{ name: "Home", icon: House }, { name: "Packages", icon: Package }, { name: "Schedule", icon: CalendarDays }, { name: "Pickups", icon: History }, { name: "Profile", icon: UserRound }] as const;
@@ -122,6 +202,44 @@ export function ResidentHome() {
     (p) => p.status === "available"
   );
 
+  // Completed appointments first; picked-up packages without one fall back
+  // to package data. Newest first.
+  const recentPickups = useMemo<PickupReceipt[]>(() => {
+    const byPackage = new Map(packages.map((p) => [p.id, p]));
+    const fromAppointments = appointments
+      .filter((a) => a.status === "completed")
+      .map((a) => ({
+        key: `appt-${a.id}`,
+        packageId: a.package_id,
+        carrierName: a.carrier_name || byPackage.get(a.package_id)?.carrier_name || "Package",
+        trackingCode: a.tracking_code || byPackage.get(a.package_id)?.tracking_code || "—",
+        description: byPackage.get(a.package_id)?.description || "",
+        pickedUpAt: a.pickup_start,
+      }));
+    const covered = new Set(fromAppointments.map((r) => r.packageId));
+    const fromPackages = packages
+      .filter((p) => p.status === "picked_up" && !covered.has(p.id))
+      .map((p) => ({
+        key: `pkg-${p.id}`,
+        packageId: p.id,
+        carrierName: p.carrier_name,
+        trackingCode: p.tracking_code,
+        description: p.description || "",
+        pickedUpAt: p.arrived_at || null,
+      }));
+    const time = (r: PickupReceipt) => (r.pickedUpAt ? new Date(r.pickedUpAt).getTime() || 0 : 0);
+    return [...fromAppointments, ...fromPackages]
+      .map(({ packageId: _packageId, ...receipt }) => receipt)
+      .sort((a, b) => time(b) - time(a));
+  }, [appointments, packages]);
+
+  // Pick up status changes made at the front desk when opening the tab.
+  useEffect(() => {
+    if (tab !== "Pickups") return;
+    void fetchAppointments();
+    void fetchPackages();
+  }, [tab, fetchAppointments, fetchPackages]);
+
   const bookPickup = async () => {
     setAppointmentError("");
     setAppointmentSuccess("");
@@ -198,6 +316,31 @@ export function ResidentHome() {
       );
     } finally {
       setAppointmentBusy(false);
+    }
+  };
+
+  /* Sprint 4 — re-evaluate pickup windows as time passes */
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const [checkingInId, setCheckingInId] = useState<number | null>(null);
+  const [checkInError, setCheckInError] = useState("");
+
+  const handleCheckIn = async (id: number) => {
+    setCheckInError("");
+    setCheckingInId(id);
+    try {
+      await checkIn(id);
+      await fetchAppointments();
+    } catch (error) {
+      setCheckInError(
+        error instanceof Error ? error.message : "Could not check in."
+      );
+    } finally {
+      setCheckingInId(null);
     }
   };
 
@@ -501,7 +644,7 @@ export function ResidentHome() {
                   {reschedulingId !== null && (
                     <Button
                       className="mt-3 ml-3"
-                      variant="outline"
+                      variant="secondary"
                       onClick={() => {
                         setReschedulingId(null);
                         setBookingPackageId("");
@@ -569,24 +712,96 @@ export function ResidentHome() {
 
             {/* ── PICKUPS tab ── */}
             {tab === "Pickups" && (
-              <section className="animate-fade-in-up md:col-span-2">
-                <h2 className="mb-3 font-display text-xl font-semibold uppercase">Past Pickups</h2>
-                {packages.filter((p) => p.status === "picked_up").length > 0 ? (
-                  <div className="space-y-3">
-                    {packages.filter((p) => p.status === "picked_up").map((pkg) => (
-                      <PackageCard
-                        key={pkg.id}
-                        carrierName={pkg.carrier_name}
-                        trackingCode={pkg.tracking_code}
-                        status={pkg.status}
-                        arrivedAt={pkg.arrived_at}
-                        {...(pkg.description ? { description: pkg.description } : {})}
+              <section className="space-y-8 animate-fade-in-up md:col-span-2">
+                <div>
+                  <h2 className="mb-3 font-display text-xl font-semibold uppercase">Scheduled Pickups</h2>
+                  {upcomingAppointments.length > 0 ? (
+                    <div className="space-y-3">
+                      {checkInError && (
+                        <p role="alert" className="text-sm text-red-500">{checkInError}</p>
+                      )}
+                      {upcomingAppointments.map((appointment) => {
+                        const prepared = appointment.package_status === "prepared";
+                        const start = new Date(appointment.pickup_start).getTime();
+                        const end = new Date(appointment.pickup_end).getTime();
+                        const checkedIn = Boolean(appointment.checked_in_at);
+                        return (
+                          <Card key={appointment.id} className="p-4">
+                            <div className="flex items-center gap-3">
+                              <CalendarDays size={18} className="shrink-0 text-primary" />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium">
+                                  {appointment.carrier_name} — {appointment.tracking_code}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(appointment.pickup_start).toLocaleString()}
+                                </p>
+                              </div>
+                              {prepared && <StatusBadge status="prepared" />}
+                            </div>
+
+                            {prepared && checkedIn && <HandoffTracker appointment={appointment} />}
+
+                            {prepared && !checkedIn && now < start && (
+                              <p className="mt-3 flex items-center gap-1.5 border-t border-border pt-3 text-sm text-muted-foreground">
+                                <Clock3 size={14} />
+                                Check-in opens at {new Date(appointment.pickup_start).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                              </p>
+                            )}
+
+                            {prepared && !checkedIn && now >= start && now <= end && (
+                              <div className="mt-3 border-t border-border pt-3">
+                                <Button
+                                  size="lg"
+                                  fullWidth
+                                  onClick={() => handleCheckIn(appointment.id)}
+                                  disabled={checkingInId !== null}
+                                >
+                                  <LogIn size={18} strokeWidth={1.8} />
+                                  {checkingInId === appointment.id ? "Checking in…" : "Check In"}
+                                </Button>
+                                <p className="mt-2 text-center text-xs text-muted-foreground">
+                                  You can check in during your pickup window.
+                                </p>
+                              </div>
+                            )}
+
+                            {prepared && !checkedIn && now > end && (
+                              <p className="mt-3 border-t border-border pt-3 text-sm text-red-500">
+                                Pickup window has passed
+                              </p>
+                            )}
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <Card>
+                      <EmptyState
+                        icon={CalendarDays}
+                        message="No pickups scheduled"
+                        action={<Button variant="secondary" onClick={() => setTab("Schedule")}>Schedule a pickup</Button>}
                       />
-                    ))}
-                  </div>
-                ) : (
-                  <Card><EmptyState icon={History} message="No pickups yet" /></Card>
-                )}
+                    </Card>
+                  )}
+                </div>
+
+                <div>
+                  <h2 className="mb-3 font-display text-xl font-semibold uppercase">Recent Pickups</h2>
+                  {recentPickups.length > 0 ? (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {recentPickups.map((receipt, i) => (
+                        <PickupReceiptCard
+                          key={receipt.key}
+                          receipt={receipt}
+                          className={`animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <Card><EmptyState icon={History} message={pkgLoading ? "Loading pickups…" : "No pickups yet"} /></Card>
+                  )}
+                </div>
               </section>
             )}
           </div>

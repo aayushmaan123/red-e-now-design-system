@@ -27,6 +27,7 @@ export interface PackageRecord {
   resident_name: string;
   resident_unit?: string;
   registered_by: number;
+  has_exception?: boolean | number;
 }
 
 export interface RegisterPackagePayload {

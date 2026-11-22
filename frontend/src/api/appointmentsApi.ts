@@ -16,6 +16,16 @@ export interface PickupAppointment {
   resident_unit?: string;
   location_code?: string;
   package_status?: string;
+  checked_in_at?: string;
+  identity_verified_at?: string;
+  identity_verified_by?: number;
+  recipient_name?: string;
+  acknowledged_at?: string;
+  handed_off_at?: string;
+  signed_off_by?: number;
+  signoff_note?: string;
+  handoff_status?: string;
+  has_exception?: boolean | number;
 }
 
 interface AppointmentListResponse {
