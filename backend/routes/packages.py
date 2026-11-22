@@ -38,6 +38,7 @@ PACKAGE_SELECT = """
         p.description,
         p.location_code,
         p.status,
+        p.has_exception,
         p.arrived_at,
         p.registered_by
     FROM packages AS p

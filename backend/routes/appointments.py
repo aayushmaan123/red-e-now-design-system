@@ -27,15 +27,15 @@ def serialize(row):
             result[key] = result[key].isoformat()
 
     if row.get("status") == "completed":
-        row["handoff_status"] = "Completed"
+        result["handoff_status"] = "Completed"
     elif row.get("acknowledged_at") is not None:
-        row["handoff_status"] = "Signed off"
+        result["handoff_status"] = "Signed off"
     elif row.get("identity_verified_at") is not None:
-        row["handoff_status"] = "Identity verified"
+        result["handoff_status"] = "Identity verified"
     elif row.get("checked_in_at") is not None:
-        row["handoff_status"] = "Waiting"
+        result["handoff_status"] = "Waiting"
     else:
-        row["handoff_status"] = "Not checked in"
+        result["handoff_status"] = "Not checked in"
 
     return result
 
@@ -47,7 +47,7 @@ def appointment_list(cursor, where="", params=()):
             a.checked_in_at, a.identity_verified_at,
             a.acknowledged_at, a.handed_off_at,
                p.tracking_code, p.carrier_name, p.location_code,
-               p.status AS package_status,
+               p.status AS package_status, p.has_exception,
                u.name AS resident_name, u.unit AS resident_unit
         FROM pickup_appointments a
         JOIN packages p ON p.id = a.package_id
