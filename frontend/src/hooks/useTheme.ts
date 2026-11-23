@@ -42,14 +42,14 @@ function applyTheme(resolved: "light" | "dark") {
 }
 
 export function useTheme() {
-  // Initialize theme from localStorage; default to "system" if nothing is
-  // stored or if localStorage is unavailable (e.g. incognito restrictions).
+  // Initialize theme from localStorage; default to "dark" (the Bold Dark Ops
+  // default) if nothing is stored or if localStorage is unavailable.
   const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "system";
+    if (typeof window === "undefined") return "dark";
     try {
-      return (localStorage.getItem(STORAGE_KEY) as Theme) || "system";
+      return (localStorage.getItem(STORAGE_KEY) as Theme) || "dark";
     } catch {
-      return "system";
+      return "dark";
     }
   });
 

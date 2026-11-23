@@ -14,13 +14,13 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
-import { initParticlesEngine } from "@tsparticles/react";
-import { loadSlim } from "@tsparticles/slim";
+import { type ReactNode } from "react";
+
+import { Toaster } from "sonner";
+import { MotionConfig } from "framer-motion";
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/context/AuthContext";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 
 
 
@@ -51,10 +51,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
@@ -99,7 +95,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=DM+Mono:wght@400;500&family=Jost:wght@400;500;600&display=swap" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
@@ -112,7 +108,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 // HTML document shell — provides <html>, <head>, <body> structure for SSR
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
         <HeadContent />
       </head>
@@ -124,21 +120,25 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-// App-level providers — particles for dark mode effects, React Query for data fetching, AuthProvider for user state
+// App-level providers — MotionConfig for reduced-motion, React Query for data, AuthProvider for user state
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const [particlesReady, setParticlesReady] = useState(false);
-
-  useEffect(() => {
-    initParticlesEngine(async (engine) => {
-      await loadSlim(engine);
-    }).then(() => setParticlesReady(true));
-  }, []);
 
   return (
+    <MotionConfig reducedMotion="user">
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <AuthProvider><Outlet /></AuthProvider>
+      <Toaster
+        theme="system"
+        position="top-center"
+        toastOptions={{
+          className: "!bg-card !text-foreground !border-border !shadow-lg",
+        }}
+        richColors
+        closeButton
+      />
     </QueryClientProvider>
+    </MotionConfig>
   );
 }

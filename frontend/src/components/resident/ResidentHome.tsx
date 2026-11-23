@@ -1,20 +1,20 @@
 /**
  * ResidentHome — the main resident dashboard.
  *
- * Sprint 2 additions:
- *  - Home tab: shows real package count + latest PackageCards from getMyPackages()
- *  - Packages tab: full list of resident's packages via PackageCard components
- *
- * Schedule, Pickups, and Profile tabs remain as-is from Sprint 1.
+ * All business logic, API calls, and component interfaces are unchanged.
  */
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { CalendarDays, Circle, CircleCheck, Clock3, LogIn, History, House, Moon, Package, Sun, UserRound, LogOut } from "lucide-react";
+import {
+  CalendarDays, Circle, CircleCheck, Clock3, LogIn, History, House,
+  Moon, Package, Sun, UserRound, LogOut, ArrowRight,
+  ChevronRight,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Avatar, Button, Card, EmptyState, PackageCard, StatusBadge, TabBar } from "@/components/common";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
-import { SparklesCore } from "@/components/ui/sparkles";
 import { getMyPackages, type PackageRecord } from "@/api/packagesApi";
 import {
   getPickupSlots,
@@ -31,46 +31,64 @@ import {
 import { checkIn } from "@/api/handoffApi";
 
 
+/* ── Animation helpers ── */
+const fadeUp = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -8 },
+  transition: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+};
+
+const stagger = {
+  animate: { transition: { staggerChildren: 0.05 } },
+};
+
+const item = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] } },
+};
+
 /* Sprint 4 — completed pickup shown as a receipt on the Pickups tab */
 interface PickupReceipt {
   key: string;
   carrierName: string;
   trackingCode: string;
   description: string;
-  // Booked pickup slot for appointment pickups; arrival date otherwise.
   pickedUpAt: string | null;
 }
 
 function PickupReceiptCard({ receipt, className }: { receipt: PickupReceipt; className?: string }) {
   const when = receipt.pickedUpAt ? new Date(receipt.pickedUpAt) : null;
   return (
-    <Card className={`p-5 ${className ?? ""}`}>
-      <div className="flex items-start gap-4">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-success/10 text-success">
-          <CircleCheck size={22} strokeWidth={1.8} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <h3 className="font-display text-lg font-semibold uppercase leading-tight">Package Picked Up</h3>
-            <StatusBadge status="picked_up" />
+    <motion.div variants={item}>
+      <Card className={`p-5 ${className ?? ""}`}>
+        <div className="flex items-start gap-4">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-success/10 text-success">
+            <CircleCheck size={22} strokeWidth={1.8} />
           </div>
-          <p className="mt-2 text-sm font-medium">{receipt.carrierName}</p>
-          <p className="break-all font-mono text-xs text-muted-foreground">{receipt.trackingCode}</p>
-          {receipt.description && (
-            <p className="mt-1 text-xs text-muted-foreground">{receipt.description}</p>
-          )}
-          <div className="mt-3 flex items-center gap-1.5 text-sm">
-            <Clock3 size={14} className="text-muted-foreground" />
-            {when && !Number.isNaN(when.getTime())
-              ? when.toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-              : "Date unavailable"}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="font-display text-lg font-semibold uppercase leading-tight">Package Picked Up</h3>
+              <StatusBadge status="picked_up" />
+            </div>
+            <p className="mt-2 text-sm font-medium">{receipt.carrierName}</p>
+            <p className="break-all font-mono text-xs text-muted-foreground">{receipt.trackingCode}</p>
+            {receipt.description && (
+              <p className="mt-1 text-xs text-muted-foreground">{receipt.description}</p>
+            )}
+            <div className="mt-3 flex items-center gap-1.5 text-sm">
+              <Clock3 size={14} className="text-muted-foreground" />
+              {when && !Number.isNaN(when.getTime())
+                ? when.toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+                : "Date unavailable"}
+            </div>
+            <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
+              Thank you for picking up your package. See you next delivery!
+            </p>
           </div>
-          <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
-            Thank you for picking up your package. See you next delivery!
-          </p>
         </div>
-      </div>
-    </Card>
+      </Card>
+    </motion.div>
   );
 }
 
@@ -88,10 +106,16 @@ function HandoffTracker({ appointment }: { appointment: PickupAppointment }) {
   ];
   return (
     <ol className="mt-4 space-y-3 border-t border-border pt-4">
-      {steps.map((step) => {
+      {steps.map((step, i) => {
         const done = step.done ?? Boolean(step.at);
         return (
-          <li key={step.label} className="flex items-start gap-3">
+          <motion.li
+            key={step.label}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.06, duration: 0.2 }}
+            className="flex items-start gap-3"
+          >
             {done ? (
               <CircleCheck size={18} strokeWidth={1.8} className="mt-0.5 shrink-0 text-success" />
             ) : (
@@ -103,12 +127,60 @@ function HandoffTracker({ appointment }: { appointment: PickupAppointment }) {
                 {done ? (step.at ? formatTime(step.at) : "Done") : "Pending"}
               </p>
             </div>
-          </li>
+          </motion.li>
         );
       })}
     </ol>
   );
 }
+
+/* ── Stat tile for the home tab ── */
+function StatTile({ label, value, icon: Icon, color }: {
+  label: string; value: number; icon: React.ComponentType<{ size?: number }>; color: string;
+}) {
+  return (
+    <motion.div variants={item}>
+      <Card className="p-4">
+        <div className="flex items-center gap-2.5">
+          <div className={`flex size-9 shrink-0 items-center justify-center rounded-md bg-secondary ${color}`}>
+            <Icon size={17} />
+          </div>
+          <div className="min-w-0">
+            <p className="font-display text-2xl font-bold leading-none tabular-nums">{value}</p>
+            <p className="mt-1 truncate text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              {label}
+            </p>
+          </div>
+        </div>
+      </Card>
+    </motion.div>
+  );
+}
+
+/* ── Quick action card ── */
+function QuickAction({ icon: Icon, title, subtitle, onClick, accent = false }: {
+  icon: React.ComponentType<{ size?: number }>; title: string; subtitle: string; onClick: () => void; accent?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex items-center gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary/20 hover:bg-secondary"
+    >
+      <div className={`flex size-10 shrink-0 items-center justify-center rounded-md ${
+        accent ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"
+      }`}>
+        <Icon size={20} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="text-xs text-muted-foreground">{subtitle}</p>
+      </div>
+      <ChevronRight size={16} className="shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+    </button>
+  );
+}
+
 
 /* Bottom navigation tabs */
 const tabs = [{ name: "Home", icon: House }, { name: "Packages", icon: Package }, { name: "Schedule", icon: CalendarDays }, { name: "Pickups", icon: History }, { name: "Profile", icon: UserRound }] as const;
@@ -202,8 +274,6 @@ export function ResidentHome() {
     (p) => p.status === "available"
   );
 
-  // Completed appointments first; picked-up packages without one fall back
-  // to package data. Newest first.
   const recentPickups = useMemo<PickupReceipt[]>(() => {
     const byPackage = new Map(packages.map((p) => [p.id, p]));
     const fromAppointments = appointments
@@ -233,7 +303,6 @@ export function ResidentHome() {
       .sort((a, b) => time(b) - time(a));
   }, [appointments, packages]);
 
-  // Pick up status changes made at the front desk when opening the tab.
   useEffect(() => {
     if (tab !== "Pickups") return;
     void fetchAppointments();
@@ -348,34 +417,44 @@ export function ResidentHome() {
   const activePackages = packages.filter((p) => p.status !== "picked_up");
 
   return (
-    <div className="relative min-h-screen bg-background pb-20 transition-theme overflow-hidden">
-      {/* Dark mode sparkle particles */}
-      {isDark && (
-        <div className="pointer-events-none fixed inset-0 z-0">
-          <SparklesCore
-            id="dashboard-sparkles"
-            background="transparent"
-            minSize={0.4}
-            maxSize={1.2}
-            particleDensity={50}
-            className="h-full w-full"
-            particleColor="#E8344D"
-            speed={0.8}
-          />
-        </div>
-      )}
-
+    <div className="relative min-h-screen bg-background pb-20">
       {/* App header */}
-      <header className="relative z-10 border-b border-border bg-card transition-theme">
-        <div className="mx-auto flex h-17 max-w-5xl items-center justify-center px-6 relative">
-          <span className="font-display text-[27px] font-bold uppercase leading-none text-primary">
+      <header className="relative z-10 border-b border-border bg-card">
+        <div className="relative mx-auto flex h-[60px] max-w-5xl items-center justify-center px-6">
+          <motion.span
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="font-display text-[27px] font-bold uppercase leading-none text-primary"
+          >
             Red-E Now
-          </span>
-          <div className="absolute right-6 flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="size-9 rounded-full p-0" aria-label="Toggle theme" onClick={toggle}>
-              {isDark ? <Sun size={18} strokeWidth={1.8} /> : <Moon size={18} strokeWidth={1.8} />}
+          </motion.span>
+          <div className="absolute right-6 flex items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="size-9 rounded-md p-0"
+              aria-label="Toggle theme"
+              onClick={toggle}
+            >
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={isDark ? "sun" : "moon"}
+                  initial={{ rotate: -90, opacity: 0 }}
+                  animate={{ rotate: 0, opacity: 1 }}
+                  exit={{ rotate: 90, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {isDark ? <Sun size={18} strokeWidth={1.8} /> : <Moon size={18} strokeWidth={1.8} />}
+                </motion.span>
+              </AnimatePresence>
             </Button>
-            <Button variant="ghost" size="sm" className="size-10 rounded-full p-0" aria-label="Open profile" onClick={() => setTab("Profile")}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="size-10 rounded-md p-0"
+              aria-label="Open profile"
+              onClick={() => setTab("Profile")}
+            >
               <Avatar name={user?.name || "Resident"} />
             </Button>
           </div>
@@ -384,434 +463,679 @@ export function ResidentHome() {
 
       <main className="relative z-10 mx-auto max-w-5xl px-6 pb-10 pt-8">
         {/* Dynamic heading */}
-        <div className="mb-8 text-center animate-fade-in-up">
-          <h1 className="font-display text-[37px] font-semibold uppercase leading-none sm:text-[44px]">
-            {tab === "Home" ? `Welcome back, ${user?.name.split(" ")[0] || "Resident"}` : tab}
-          </h1>
-          {tab === "Home" && <p className="mt-3 text-sm text-muted-foreground">Here's what's happening at your building.</p>}
-        </div>
-
-        {/* Profile tab */}
-        {tab === "Profile" ? (
-          <Card className="p-6 animate-fade-in-up">
-            <div className="flex items-center gap-4">
-              <Avatar name={user?.name || "Resident"} />
-              <div>
-                <p className="font-medium">{user?.name}</p>
-                <p className="text-sm text-muted-foreground">{user?.email}</p>
-              </div>
-            </div>
-            <div className="mt-6 flex items-center justify-between rounded-lg border border-border p-4">
-              <div>
-                <p className="text-sm font-medium">Dark Mode</p>
-                <p className="text-xs text-muted-foreground">Switch between light and dark themes</p>
-              </div>
-              <Button variant="secondary" size="sm" onClick={toggle} className="gap-2">
-                {isDark ? <Sun size={15} /> : <Moon size={15} />}
-                {isDark ? "Light" : "Dark"}
-              </Button>
-            </div>
-            <Button variant="secondary" className="mt-6" onClick={() => { signOut(); navigate({ to: "/login", replace: true }); }}>
-              <LogOut size={16} /> Sign out
-            </Button>
-          </Card>
-        ) : (
-          <div className="grid gap-7 md:grid-cols-2">
-
-            {/* ── YOUR PACKAGES — Home + Packages tabs ── */}
-            {(tab === "Home" || tab === "Packages") && (
-              <section className={`animate-fade-in-up stagger-1 ${tab === "Packages" ? "md:col-span-2" : ""}`}>
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="font-display text-xl font-semibold uppercase">Your Packages</h2>
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {String(activePackages.length).padStart(2, "0")}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.2 }}
+            className="mb-8 text-center"
+          >
+            <h1 className="font-display text-[37px] font-semibold uppercase leading-none sm:text-[44px]">
+              {tab === "Home" ? (
+                <>
+                  Welcome back,{" "}
+                  <span className="text-primary">
+                    {user?.name.split(" ")[0] || "Resident"}
                   </span>
-                </div>
-
-                {pkgLoading ? (
-                  <Card className="p-8 text-center">
-                    <p className="text-sm text-muted-foreground">Loading packages…</p>
-                  </Card>
-                ) : activePackages.length > 0 ? (
-                  <div className="space-y-3">
-                    {(tab === "Home" ? activePackages.slice(0, 3) : activePackages).map((pkg) => (
-                      <PackageCard
-                        key={pkg.id}
-                        carrierName={pkg.carrier_name}
-                        trackingCode={pkg.tracking_code}
-                        status={pkg.status}
-                        arrivedAt={pkg.arrived_at}
-                        {...(pkg.description ? { description: pkg.description } : {})}
-                      />
-                    ))}
-                    {tab === "Home" && activePackages.length > 3 && (
-                      <Button variant="ghost" fullWidth onClick={() => setTab("Packages")} className="text-primary">
-                        View all {activePackages.length} packages
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <Card hover={tab === "Home"} {...(tab === "Home" ? { onClick: () => setTab("Packages") } : {})}>
-                    <EmptyState icon={Package} message="No packages waiting for you right now" />
-                  </Card>
-                )}
-              </section>
-            )}
-
-
-            {/* Sprint 3 — Upcoming pickups */}
+                </>
+              ) : tab}
+            </h1>
             {tab === "Home" && (
-              <section className="animate-fade-in-up stagger-2">
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="font-display text-xl font-semibold uppercase">
-                    Upcoming Pickups
-                  </h2>
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {String(upcomingAppointments.length).padStart(2, "0")}
-                  </span>
-                </div>
-
-                {upcomingAppointments.length ? (
-                  <div className="space-y-3">
-                    {upcomingAppointments.map((appointment) => (
-                      <Card key={appointment.id} className="p-4">
-                        <p className="font-medium">
-                          {appointment.carrier_name} — {appointment.tracking_code}
-                        </p>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          {new Date(appointment.pickup_start).toLocaleString()}
-                        </p>
-                        <button
-                            type="button"
-                            onClick={() => beginReschedule(appointment)}
-                            disabled={appointmentBusy}
-                            className="min-h-11 rounded-lg border border-border px-3 py-2 text-sm"
-                          >
-                            Reschedule
-                          </button>
-                          <Button
-                          variant="secondary"
-                          size="sm"
-                          className="mt-3"
-                          onClick={() => cancelPickup(appointment.id)}
-                          disabled={appointmentBusy}
-                        >
-                          Cancel Pickup
-                        </Button>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <Card hover onClick={() => setTab("Schedule")}>
-                    <EmptyState
-                      icon={Clock3}
-                      message="No pickups scheduled — tap to schedule"
-                    />
-                  </Card>
-                )}
-              </section>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="mt-3 text-sm text-muted-foreground"
+              >
+                Here's what's happening at your building.
+              </motion.p>
             )}
+          </motion.div>
+        </AnimatePresence>
 
-            {/* Sprint 3 — Real pickup booking */}
-            {tab === "Schedule" && (
-              <section className="animate-fade-in-up md:col-span-2 space-y-5">
+        {/* Tab content */}
+        <AnimatePresence mode="wait">
+          <motion.div key={tab} {...fadeUp}>
+
+            {/* ── PROFILE TAB ── */}
+            {tab === "Profile" && (
+              <div className="mx-auto max-w-md space-y-5">
+                {/* Profile header card */}
                 <Card className="p-6">
-                  <h2 className="font-display text-xl font-semibold uppercase">
-                    {reschedulingId !== null ? "Reschedule Pickup" : "Schedule a Package Pickup"}
-                  </h2>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Choose an available package and a weekday pickup slot.
-                    Appointments are 30 minutes, from 9 AM to 5 PM.
-                  </p>
-
-                  <div className="mt-5 grid gap-4 sm:grid-cols-3">
-                    <label className="text-sm">
-                      Package
-                      <select
-                        className="mt-2 w-full rounded-lg border border-border bg-background p-3"
-                        value={bookingPackageId}
-                        disabled={reschedulingId !== null}
-                        onChange={(event) => setBookingPackageId(event.target.value)}
-                      >
-                        <option value="">
-                          {reschedulingId !== null ? "Current package" : "Select package"}
-                        </option>
-                        {reschedulingId !== null && packages
-                          .filter((pkg) => String(pkg.id) === bookingPackageId)
-                          .map((pkg) => (
-                            <option key={pkg.id} value={pkg.id}>
-                              {pkg.carrier_name} — {pkg.tracking_code}
-                            </option>
-                          ))}
-                        {availablePackages.map((pkg) => (
-                          <option key={pkg.id} value={pkg.id}>
-                            {pkg.carrier_name} — {pkg.tracking_code}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="text-sm">
-                      Pickup Date
-                      <input
-                        type="date"
-                        className="mt-2 w-full rounded-lg border border-border bg-background p-3"
-                        min={new Date().toLocaleDateString("en-CA")}
-                        value={bookingDate}
-                        onChange={(event) => setBookingDate(event.target.value)}
-                      />
-                    </label>
-
-                    <label className="text-sm">
-                      Pickup Time
-                      <select
-                        className="mt-2 w-full rounded-lg border border-border bg-background p-3"
-                        value={bookingTime}
-                        onChange={(event) => setBookingTime(event.target.value)}
-                      >
-                        {Array.from({ length: 16 }, (_, index) => {
-                          const hour = 9 + Math.floor(index / 2);
-                          const minute = index % 2 ? "30" : "00";
-                          const time = `${String(hour).padStart(2, "0")}:${minute}`;
-                          return (
-                            <option key={time} value={time}>
-                              {time}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </label>
+                  <div className="flex flex-col items-center gap-4 text-center">
+                    <div className="rounded-full ring-2 ring-primary/20 ring-offset-2 ring-offset-background">
+                      <Avatar name={user?.name || "Resident"} />
+                    </div>
+                    <div>
+                      <p className="font-display text-xl font-semibold uppercase">{user?.name}</p>
+                      <p className="mt-1 font-mono text-xs text-muted-foreground">{user?.email}</p>
+                    </div>
                   </div>
-
-                  
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">
-                      Available pickup times
-                    </label>
-                    {slotsLoading ? (
-                      <p className="text-sm text-muted-foreground">
-                        Loading available times...
-                      </p>
-                    ) : pickupSlots.filter((slot) => slot.available).length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No open pickup times for this date. Choose another date.
-                      </p>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                        {pickupSlots
-                          .filter((slot) => slot.available)
-                          .map((slot) => {
-                            const time = slot.pickup_start.slice(11, 16);
-                            const selected = bookingTime === time;
-                            return (
-                              <button
-                                key={slot.pickup_start}
-                                type="button"
-                                onClick={() => setBookingTime(time)}
-                                aria-pressed={selected}
-                                className={`min-h-11 rounded-lg border px-3 py-2 text-sm ${
-                                  selected
-                                    ? "border-primary bg-primary/10 text-primary"
-                                    : "border-border bg-card"
-                                }`}
-                              >
-                                {time}
-                                <span className="block text-xs opacity-70">
-                                  {slot.remaining} remaining
-                                </span>
-                              </button>
-                            );
-                          })}
-                      </div>
-                    )}
-                  </div>
-
-                  {bookingDate && bookingTime && (
-                    <p className="text-sm text-muted-foreground">
-                      Review: {reschedulingId !== null ? "Change pickup to" : "Book pickup for"}{" "}
-                      {new Date(`${bookingDate}T${bookingTime}`).toLocaleString()}
-                    </p>
-                  )}
-
-<Button
-                    className="mt-5"
-                    onClick={bookPickup}
-                    disabled={appointmentBusy || (reschedulingId === null && availablePackages.length === 0)}
-                  >
-                    {appointmentBusy ? "Saving..." : reschedulingId !== null ? "Confirm Reschedule" : "Confirm Pickup"}
-                  </Button>
-
-                  {reschedulingId !== null && (
-                    <Button
-                      className="mt-3 ml-3"
-                      variant="secondary"
-                      onClick={() => {
-                        setReschedulingId(null);
-                        setBookingPackageId("");
-                        setAppointmentError("");
-                      }}
-                    >
-                      Cancel Rescheduling
-                    </Button>
-                  )}
-
-                  {reschedulingId === null && availablePackages.length === 0 && (
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      You have no available packages to schedule.
-                    </p>
-                  )}
-                  {appointmentError && (
-                    <p role="alert" className="mt-3 text-sm text-red-500">
-                      {appointmentError}
-                    </p>
-                  )}
-                  {appointmentSuccess && (
-                    <p className="mt-3 text-sm text-green-500">
-                      {appointmentSuccess}
-                    </p>
-                  )}
                 </Card>
 
-                <Card className="p-6">
-                  <h2 className="font-display text-xl font-semibold uppercase">
-                    Your Scheduled Pickups
-                  </h2>
-                  {upcomingAppointments.length === 0 ? (
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      No pickups scheduled yet.
-                    </p>
-                  ) : (
-                    <div className="mt-4 space-y-4">
-                      {upcomingAppointments.map((appointment) => (
-                        <div
-                          key={appointment.id}
-                          className="rounded-lg border border-border p-4"
-                        >
-                          <p className="font-medium">
-                            {appointment.carrier_name} — {appointment.tracking_code}
-                          </p>
+                {/* Theme toggle card */}
+                <motion.div variants={item} initial="initial" animate="animate">
+                  <Card>
+                    <div className="flex items-center justify-between p-5">
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                          {isDark ? <Moon size={17} /> : <Sun size={17} />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">Appearance</p>
+                          <p className="text-xs text-muted-foreground">{isDark ? "Dark" : "Light"} mode active</p>
+                        </div>
+                      </div>
+                      <Button variant="secondary" size="sm" onClick={toggle} className="gap-2">
+                        {isDark ? <Sun size={15} /> : <Moon size={15} />}
+                        {isDark ? "Light" : "Dark"}
+                      </Button>
+                    </div>
+                  </Card>
+                </motion.div>
+
+                {/* Quick stats */}
+                <motion.div variants={item} initial="initial" animate="animate" transition={{ delay: 0.1 }}>
+                  <Card>
+                    <div className="grid grid-cols-3 divide-x divide-border p-5">
+                      <div className="text-center">
+                        <p className="font-display text-2xl font-bold text-primary">{activePackages.length}</p>
+                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Active</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="font-display text-2xl font-bold">{upcomingAppointments.length}</p>
+                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Scheduled</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="font-display text-2xl font-bold">{recentPickups.length}</p>
+                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Completed</p>
+                      </div>
+                    </div>
+                  </Card>
+                </motion.div>
+
+                {/* Sign out */}
+                <motion.div variants={item} initial="initial" animate="animate" transition={{ delay: 0.15 }}>
+                  <Button
+                    variant="secondary"
+                    fullWidth
+                    className="gap-2"
+                    onClick={() => { signOut(); navigate({ to: "/login", replace: true }); }}
+                  >
+                    <LogOut size={16} /> Sign out
+                  </Button>
+                </motion.div>
+              </div>
+            )}
+
+            {tab !== "Profile" && (
+              <div className="grid gap-7 md:grid-cols-2">
+
+                {/* ── HOME TAB — stat cards + quick actions ── */}
+                {tab === "Home" && (
+                  <>
+                    {/* Stat cards row */}
+                    <motion.div
+                      className="md:col-span-2"
+                      variants={stagger}
+                      initial="initial"
+                      animate="animate"
+                    >
+                      <div className="grid grid-cols-3 gap-3">
+                        <StatTile label="Active Packages" value={activePackages.length} icon={Package} color="text-primary" />
+                        <StatTile label="Scheduled" value={upcomingAppointments.length} icon={CalendarDays} color="text-blue-400" />
+                        <StatTile label="Completed" value={recentPickups.length} icon={CircleCheck} color="text-success" />
+                      </div>
+                    </motion.div>
+
+                    {/* Your Packages section */}
+                    <section>
+                      <div className="mb-3 flex items-center justify-between">
+                        <h2 className="font-display text-xl font-semibold uppercase">Your Packages</h2>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          <span className="tabular-nums">{String(activePackages.length).padStart(2, "0")}</span>
+                        </span>
+                      </div>
+
+                      {pkgLoading ? (
+                        <Card className="p-8 text-center">
+                          <p className="text-sm text-muted-foreground">Loading packages…</p>
+                        </Card>
+                      ) : activePackages.length > 0 ? (
+                        <motion.div className="space-y-3" variants={stagger} initial="initial" animate="animate">
+                          {activePackages.slice(0, 3).map((pkg) => (
+                            <motion.div key={pkg.id} variants={item}>
+                              <PackageCard
+                                carrierName={pkg.carrier_name}
+                                trackingCode={pkg.tracking_code}
+                                status={pkg.status}
+                                arrivedAt={pkg.arrived_at}
+                                {...(pkg.description ? { description: pkg.description } : {})}
+                              />
+                            </motion.div>
+                          ))}
+                          {activePackages.length > 3 && (
+                            <motion.div variants={item}>
+                              <Button variant="ghost" fullWidth onClick={() => setTab("Packages")} className="text-primary">
+                                View all {activePackages.length} packages <ArrowRight size={15} />
+                              </Button>
+                            </motion.div>
+                          )}
+                        </motion.div>
+                      ) : (
+                        <Card hover onClick={() => setTab("Packages")}>
+                          <EmptyState icon={Package} message="No packages waiting for you right now" />
+                        </Card>
+                      )}
+                    </section>
+
+                    {/* Upcoming Pickups section */}
+                    <section>
+                      <div className="mb-3 flex items-center justify-between">
+                        <h2 className="font-display text-xl font-semibold uppercase">
+                          Upcoming Pickups
+                        </h2>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          <span className="tabular-nums">{String(upcomingAppointments.length).padStart(2, "0")}</span>
+                        </span>
+                      </div>
+
+                      {upcomingAppointments.length ? (
+                        <motion.div className="space-y-3" variants={stagger} initial="initial" animate="animate">
+                          {upcomingAppointments.map((appointment) => (
+                            <motion.div key={appointment.id} variants={item}>
+                              <Card className="p-4">
+                                <div className="flex items-start gap-3">
+                                  <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                    <CalendarDays size={17} />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate font-medium">
+                                      {appointment.carrier_name} — {appointment.tracking_code}
+                                    </p>
+                                    <p className="mt-1 font-mono text-xs text-muted-foreground">
+                                      {new Date(appointment.pickup_start).toLocaleString()}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="mt-3 flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => beginReschedule(appointment)}
+                                    disabled={appointmentBusy}
+                                    className="min-h-9 rounded-md border border-border px-3 py-1.5 text-sm transition-colors hover:bg-secondary disabled:opacity-50"
+                                  >
+                                    Reschedule
+                                  </button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => cancelPickup(appointment.id)}
+                                    disabled={appointmentBusy}
+                                    className="text-muted-foreground hover:text-destructive"
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </Card>
+                            </motion.div>
+                          ))}
+                        </motion.div>
+                      ) : (
+                        <Card hover onClick={() => setTab("Schedule")}>
+                          <EmptyState
+                            icon={Clock3}
+                            message="No pickups scheduled — tap to schedule"
+                          />
+                        </Card>
+                      )}
+                    </section>
+
+                    {/* Quick actions */}
+                    <motion.div
+                      className="md:col-span-2"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                    >
+                      <div className="grid grid-cols-2 gap-3">
+                        <QuickAction
+                          icon={CalendarDays}
+                          title="Schedule Pickup"
+                          subtitle="Book a time slot"
+                          onClick={() => setTab("Schedule")}
+                          accent
+                        />
+                        <QuickAction
+                          icon={History}
+                          title="View Pickups"
+                          subtitle="History & receipts"
+                          onClick={() => setTab("Pickups")}
+                        />
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+
+                {/* ── PACKAGES TAB ── */}
+                {tab === "Packages" && (
+                  <section className="md:col-span-2">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h2 className="font-display text-xl font-semibold uppercase">Your Packages</h2>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        <span className="tabular-nums">{String(activePackages.length).padStart(2, "0")}</span>
+                      </span>
+                    </div>
+
+                    {pkgLoading ? (
+                      <Card className="p-8 text-center">
+                        <p className="text-sm text-muted-foreground">Loading packages…</p>
+                      </Card>
+                    ) : activePackages.length > 0 ? (
+                      <motion.div className="space-y-3" variants={stagger} initial="initial" animate="animate">
+                        {activePackages.map((pkg) => (
+                          <motion.div key={pkg.id} variants={item}>
+                            <PackageCard
+                              carrierName={pkg.carrier_name}
+                              trackingCode={pkg.tracking_code}
+                              status={pkg.status}
+                              arrivedAt={pkg.arrived_at}
+                              {...(pkg.description ? { description: pkg.description } : {})}
+                            />
+                          </motion.div>
+                        ))}
+                      </motion.div>
+                    ) : (
+                      <Card>
+                        <EmptyState icon={Package} message="No packages waiting for you right now" />
+                      </Card>
+                    )}
+                  </section>
+                )}
+
+
+                {/* Sprint 3 — Real pickup booking */}
+                {tab === "Schedule" && (
+                  <section className="space-y-5 md:col-span-2">
+                    <Card className="p-6">
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-10 items-center justify-center rounded-md bg-primary/10 text-primary">
+                          <CalendarDays size={20} />
+                        </div>
+                        <div>
+                          <h2 className="font-display text-xl font-semibold uppercase">
+                            {reschedulingId !== null ? "Reschedule Pickup" : "Schedule a Package Pickup"}
+                          </h2>
                           <p className="mt-1 text-sm text-muted-foreground">
-                            {new Date(appointment.pickup_start).toLocaleString()}
+                            Choose an available package and a weekday pickup slot.
                           </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                        <label className="text-sm font-medium">
+                          Package
+                          <select
+                            className="mt-2 w-full rounded-md border border-border bg-background p-3 transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+                            value={bookingPackageId}
+                            disabled={reschedulingId !== null}
+                            onChange={(event) => setBookingPackageId(event.target.value)}
+                          >
+                            <option value="">
+                              {reschedulingId !== null ? "Current package" : "Select package"}
+                            </option>
+                            {reschedulingId !== null && packages
+                              .filter((pkg) => String(pkg.id) === bookingPackageId)
+                              .map((pkg) => (
+                                <option key={pkg.id} value={pkg.id}>
+                                  {pkg.carrier_name} — {pkg.tracking_code}
+                                </option>
+                              ))}
+                            {availablePackages.map((pkg) => (
+                              <option key={pkg.id} value={pkg.id}>
+                                {pkg.carrier_name} — {pkg.tracking_code}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="text-sm font-medium">
+                          Pickup Date
+                          <input
+                            type="date"
+                            className="mt-2 w-full rounded-md border border-border bg-background p-3 transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+                            min={new Date().toLocaleDateString("en-CA")}
+                            value={bookingDate}
+                            onChange={(event) => setBookingDate(event.target.value)}
+                          />
+                        </label>
+
+                        <label className="text-sm font-medium">
+                          Pickup Time
+                          <select
+                            className="mt-2 w-full rounded-md border border-border bg-background p-3 transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+                            value={bookingTime}
+                            onChange={(event) => setBookingTime(event.target.value)}
+                          >
+                            {Array.from({ length: 16 }, (_, index) => {
+                              const hour = 9 + Math.floor(index / 2);
+                              const minute = index % 2 ? "30" : "00";
+                              const time = `${String(hour).padStart(2, "0")}:${minute}`;
+                              return (
+                                <option key={time} value={time}>
+                                  {time}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </label>
+                      </div>
+
+                      {/* Available pickup time slots */}
+                      <div className="mt-6 space-y-3">
+                        <label className="block text-sm font-medium">
+                          Available pickup times
+                        </label>
+                        {slotsLoading ? (
+                          <p className="text-sm text-muted-foreground">
+                            Loading available times…
+                          </p>
+                        ) : pickupSlots.filter((slot) => slot.available).length === 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                            No open pickup times for this date. Choose another date.
+                          </p>
+                        ) : (
+                          <motion.div
+                            className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+                            variants={stagger}
+                            initial="initial"
+                            animate="animate"
+                          >
+                            {pickupSlots
+                              .filter((slot) => slot.available)
+                              .map((slot) => {
+                                const time = slot.pickup_start.slice(11, 16);
+                                const selected = bookingTime === time;
+                                return (
+                                  <motion.button
+                                    key={slot.pickup_start}
+                                    type="button"
+                                    onClick={() => setBookingTime(time)}
+                                    aria-pressed={selected}
+                                    variants={item}
+                                    className={`min-h-11 rounded-md border px-3 py-2.5 text-sm transition-colors ${
+                                      selected
+                                        ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/30"
+                                        : "border-border bg-card hover:border-primary/20 hover:bg-secondary"
+                                    }`}
+                                  >
+                                    <span className="font-medium">{time}</span>
+                                    <span className="block font-mono text-[10px] opacity-70">
+                                      {slot.remaining} remaining
+                                    </span>
+                                  </motion.button>
+                                );
+                              })}
+                          </motion.div>
+                        )}
+                      </div>
+
+                      {bookingDate && bookingTime && (
+                        <motion.p
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="mt-4 rounded-md bg-secondary px-4 py-2.5 text-sm text-muted-foreground"
+                        >
+                          Review: {reschedulingId !== null ? "Change pickup to" : "Book pickup for"}{" "}
+                          <span className="font-medium text-foreground">
+                            {new Date(`${bookingDate}T${bookingTime}`).toLocaleString()}
+                          </span>
+                        </motion.p>
+                      )}
+
+                      <div className="mt-5 flex items-center gap-3">
+                        <Button
+                          onClick={bookPickup}
+                          disabled={appointmentBusy || (reschedulingId === null && availablePackages.length === 0)}
+                        >
+                          {appointmentBusy ? "Saving…" : reschedulingId !== null ? "Confirm Reschedule" : "Confirm Pickup"}
+                        </Button>
+
+                        {reschedulingId !== null && (
                           <Button
                             variant="secondary"
-                            size="sm"
-                            className="mt-3"
-                            onClick={() => cancelPickup(appointment.id)}
-                            disabled={appointmentBusy}
+                            onClick={() => {
+                              setReschedulingId(null);
+                              setBookingPackageId("");
+                              setAppointmentError("");
+                            }}
                           >
-                            Cancel Pickup
+                            Cancel Rescheduling
                           </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </Card>
-              </section>
-            )}
+                        )}
+                      </div>
 
-            {/* ── PICKUPS tab ── */}
-            {tab === "Pickups" && (
-              <section className="space-y-8 animate-fade-in-up md:col-span-2">
-                <div>
-                  <h2 className="mb-3 font-display text-xl font-semibold uppercase">Scheduled Pickups</h2>
-                  {upcomingAppointments.length > 0 ? (
-                    <div className="space-y-3">
-                      {checkInError && (
-                        <p role="alert" className="text-sm text-red-500">{checkInError}</p>
+                      {reschedulingId === null && availablePackages.length === 0 && (
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          You have no available packages to schedule.
+                        </p>
                       )}
-                      {upcomingAppointments.map((appointment) => {
-                        const prepared = appointment.package_status === "prepared";
-                        const start = new Date(appointment.pickup_start).getTime();
-                        const end = new Date(appointment.pickup_end).getTime();
-                        const checkedIn = Boolean(appointment.checked_in_at);
-                        return (
-                          <Card key={appointment.id} className="p-4">
-                            <div className="flex items-center gap-3">
-                              <CalendarDays size={18} className="shrink-0 text-primary" />
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium">
-                                  {appointment.carrier_name} — {appointment.tracking_code}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {new Date(appointment.pickup_start).toLocaleString()}
-                                </p>
-                              </div>
-                              {prepared && <StatusBadge status="prepared" />}
-                            </div>
 
-                            {prepared && checkedIn && <HandoffTracker appointment={appointment} />}
+                      <AnimatePresence>
+                        {appointmentError && (
+                          <motion.p
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            role="alert"
+                            className="mt-3 rounded-md bg-destructive/10 px-4 py-2.5 text-sm text-red-500"
+                          >
+                            {appointmentError}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
 
-                            {prepared && !checkedIn && now < start && (
-                              <p className="mt-3 flex items-center gap-1.5 border-t border-border pt-3 text-sm text-muted-foreground">
-                                <Clock3 size={14} />
-                                Check-in opens at {new Date(appointment.pickup_start).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-                              </p>
-                            )}
-
-                            {prepared && !checkedIn && now >= start && now <= end && (
-                              <div className="mt-3 border-t border-border pt-3">
-                                <Button
-                                  size="lg"
-                                  fullWidth
-                                  onClick={() => handleCheckIn(appointment.id)}
-                                  disabled={checkingInId !== null}
-                                >
-                                  <LogIn size={18} strokeWidth={1.8} />
-                                  {checkingInId === appointment.id ? "Checking in…" : "Check In"}
-                                </Button>
-                                <p className="mt-2 text-center text-xs text-muted-foreground">
-                                  You can check in during your pickup window.
-                                </p>
-                              </div>
-                            )}
-
-                            {prepared && !checkedIn && now > end && (
-                              <p className="mt-3 border-t border-border pt-3 text-sm text-red-500">
-                                Pickup window has passed
-                              </p>
-                            )}
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <Card>
-                      <EmptyState
-                        icon={CalendarDays}
-                        message="No pickups scheduled"
-                        action={<Button variant="secondary" onClick={() => setTab("Schedule")}>Schedule a pickup</Button>}
-                      />
+                      <AnimatePresence>
+                        {appointmentSuccess && (
+                          <motion.p
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            className="mt-3 rounded-md bg-success/10 px-4 py-2.5 text-sm text-green-500"
+                          >
+                            {appointmentSuccess}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
                     </Card>
-                  )}
-                </div>
 
-                <div>
-                  <h2 className="mb-3 font-display text-xl font-semibold uppercase">Recent Pickups</h2>
-                  {recentPickups.length > 0 ? (
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {recentPickups.map((receipt, i) => (
-                        <PickupReceiptCard
-                          key={receipt.key}
-                          receipt={receipt}
-                          className={`animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}
-                        />
-                      ))}
+                    <Card className="p-6">
+                      <h2 className="font-display text-xl font-semibold uppercase">
+                        Your Scheduled Pickups
+                      </h2>
+                      {upcomingAppointments.length === 0 ? (
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          No pickups scheduled yet.
+                        </p>
+                      ) : (
+                        <motion.div
+                          className="mt-4 space-y-3"
+                          variants={stagger}
+                          initial="initial"
+                          animate="animate"
+                        >
+                          {upcomingAppointments.map((appointment) => (
+                            <motion.div
+                              key={appointment.id}
+                              variants={item}
+                              className="rounded-lg border border-border p-4 transition-colors hover:bg-secondary"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                  <CalendarDays size={15} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate font-medium">
+                                    {appointment.carrier_name} — {appointment.tracking_code}
+                                  </p>
+                                  <p className="mt-1 font-mono text-xs text-muted-foreground">
+                                    {new Date(appointment.pickup_start).toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="mt-3 text-muted-foreground hover:text-destructive"
+                                onClick={() => cancelPickup(appointment.id)}
+                                disabled={appointmentBusy}
+                              >
+                                Cancel Pickup
+                              </Button>
+                            </motion.div>
+                          ))}
+                        </motion.div>
+                      )}
+                    </Card>
+                  </section>
+                )}
+
+                {/* ── PICKUPS tab ── */}
+                {tab === "Pickups" && (
+                  <section className="space-y-8 md:col-span-2">
+                    <div>
+                      <h2 className="mb-3 font-display text-xl font-semibold uppercase">Scheduled Pickups</h2>
+                      {upcomingAppointments.length > 0 ? (
+                        <motion.div
+                          className="space-y-3"
+                          variants={stagger}
+                          initial="initial"
+                          animate="animate"
+                        >
+                          <AnimatePresence>
+                            {checkInError && (
+                              <motion.p
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                role="alert"
+                                className="rounded-md bg-destructive/10 px-4 py-2.5 text-sm text-red-500"
+                              >
+                                {checkInError}
+                              </motion.p>
+                            )}
+                          </AnimatePresence>
+                          {upcomingAppointments.map((appointment) => {
+                            const prepared = appointment.package_status === "prepared";
+                            const start = new Date(appointment.pickup_start).getTime();
+                            const end = new Date(appointment.pickup_end).getTime();
+                            const checkedIn = Boolean(appointment.checked_in_at);
+                            return (
+                              <motion.div key={appointment.id} variants={item}>
+                                <Card className="p-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                      <CalendarDays size={18} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate text-sm font-medium">
+                                        {appointment.carrier_name} — {appointment.tracking_code}
+                                      </p>
+                                      <p className="font-mono text-xs text-muted-foreground">
+                                        {new Date(appointment.pickup_start).toLocaleString()}
+                                      </p>
+                                    </div>
+                                    {prepared && <StatusBadge status="prepared" />}
+                                  </div>
+
+                                  {prepared && checkedIn && <HandoffTracker appointment={appointment} />}
+
+                                  {prepared && !checkedIn && now < start && (
+                                    <p className="mt-3 flex items-center gap-1.5 border-t border-border pt-3 text-sm text-muted-foreground">
+                                      <Clock3 size={14} />
+                                      Check-in opens at {new Date(appointment.pickup_start).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                                    </p>
+                                  )}
+
+                                  {prepared && !checkedIn && now >= start && now <= end && (
+                                    <div className="mt-3 border-t border-border pt-3">
+                                      <Button
+                                        size="lg"
+                                        fullWidth
+                                        onClick={() => handleCheckIn(appointment.id)}
+                                        disabled={checkingInId !== null}
+                                      >
+                                        <LogIn size={18} strokeWidth={1.8} />
+                                        {checkingInId === appointment.id ? "Checking in…" : "Check In"}
+                                      </Button>
+                                      <p className="mt-2 text-center text-xs text-muted-foreground">
+                                        You can check in during your pickup window.
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {prepared && !checkedIn && now > end && (
+                                    <p className="mt-3 border-t border-border pt-3 text-sm text-red-500">
+                                      Pickup window has passed
+                                    </p>
+                                  )}
+                                </Card>
+                              </motion.div>
+                            );
+                          })}
+                        </motion.div>
+                      ) : (
+                        <Card>
+                          <EmptyState
+                            icon={CalendarDays}
+                            message="No pickups scheduled"
+                            action={<Button variant="secondary" onClick={() => setTab("Schedule")}>Schedule a pickup</Button>}
+                          />
+                        </Card>
+                      )}
                     </div>
-                  ) : (
-                    <Card><EmptyState icon={History} message={pkgLoading ? "Loading pickups…" : "No pickups yet"} /></Card>
-                  )}
-                </div>
-              </section>
-            )}
-          </div>
-        )}
 
-        {tab === "Home" && (
-          <div className="mt-9 border-t border-border pt-6 animate-fade-in stagger-3">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground text-center">Red-E Now / Your residence, simplified</p>
-          </div>
-        )}
+                    <div>
+                      <h2 className="mb-3 font-display text-xl font-semibold uppercase">Recent Pickups</h2>
+                      {recentPickups.length > 0 ? (
+                        <motion.div
+                          className="grid gap-3 md:grid-cols-2"
+                          variants={stagger}
+                          initial="initial"
+                          animate="animate"
+                        >
+                          {recentPickups.map((receipt) => (
+                            <PickupReceiptCard
+                              key={receipt.key}
+                              receipt={receipt}
+                            />
+                          ))}
+                        </motion.div>
+                      ) : (
+                        <Card>
+                          <EmptyState icon={History} message={pkgLoading ? "Loading pickups…" : "No pickups yet"} />
+                        </Card>
+                      )}
+                    </div>
+                  </section>
+                )}
+              </div>
+            )}
+
+            {tab === "Home" && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="mt-9 border-t border-border pt-6"
+              >
+                <p className="text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Red-E Now / Your residence, simplified</p>
+              </motion.div>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* Fixed bottom tab navigation */}

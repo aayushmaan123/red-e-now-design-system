@@ -167,7 +167,7 @@ export function WeekStripCalendar({
               type="button"
               onClick={() => setSelectedDate(startOfDay(day))}
               className={cn(
-                "group relative flex flex-col items-center gap-0.5 rounded-xl py-2.5 text-center transition-all duration-200",
+                "group relative flex flex-col items-center gap-0.5 rounded-lg py-2.5 text-center transition-colors duration-200",
                 selected
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : past
@@ -201,7 +201,7 @@ export function WeekStripCalendar({
       </div>
 
       {/* Selected day detail — shows time slots or appropriate empty/past state */}
-      <Card className="animate-fade-in-up p-5">
+      <Card className="animate-fade-in p-5">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <p className="font-display text-lg font-semibold uppercase">
@@ -237,7 +237,7 @@ export function WeekStripCalendar({
                 disabled={!slot.available}
                 onClick={() => onSlotSelect?.(selectedDate, slot)}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm transition-all duration-200",
+                  "flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm transition-colors duration-200",
                   selectedSlotId === slot.id
                     ? "border-primary bg-primary/10 text-foreground shadow-sm"
                     : slot.available
