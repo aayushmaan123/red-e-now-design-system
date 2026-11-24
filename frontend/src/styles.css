@@ -237,6 +237,32 @@
   mask-image: radial-gradient(70% 80% at 70% 50%, #000 10%, transparent 75%);
 }
 
+/* Section divider: soft gradient fade between landing sections */
+.section-fade {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
+  margin: 0 auto;
+  max-width: 72rem;
+  opacity: 0.5;
+}
+
+/* Subtle dot-grid behind the How It Works section */
+.grid-field {
+  position: relative;
+}
+.grid-field::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.08;
+  background-image: radial-gradient(var(--foreground) 0.6px, transparent 1px);
+  background-size: 28px 28px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent);
+}
+
 /* Drawer/modal entrances */
 @keyframes slide-in-from-right {
   from { transform: translateX(100%); }
