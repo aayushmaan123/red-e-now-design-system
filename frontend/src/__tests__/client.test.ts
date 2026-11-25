@@ -39,7 +39,7 @@ describe("api() client", () => {
     const result = await api<{ success: boolean; data: number }>("/test");
 
     expect(mockFetch).toHaveBeenCalledOnce();
-    const [url] = mockFetch.mock.calls[0];
+    const [url] = mockFetch.mock.calls[0]!;
     expect(url).toContain("/test");
     expect(result.data).toBe(42);
   });
@@ -50,7 +50,7 @@ describe("api() client", () => {
 
     await api("/protected");
 
-    const [, opts] = mockFetch.mock.calls[0];
+    const [, opts] = mockFetch.mock.calls[0]!;
     const headers = new Headers(opts.headers);
     expect(headers.get("Authorization")).toBe("Bearer test-jwt-token");
   });
@@ -63,7 +63,7 @@ describe("api() client", () => {
       body: JSON.stringify({ name: "test" }),
     });
 
-    const [, opts] = mockFetch.mock.calls[0];
+    const [, opts] = mockFetch.mock.calls[0]!;
     const headers = new Headers(opts.headers);
     expect(headers.get("Content-Type")).toBe("application/json");
   });

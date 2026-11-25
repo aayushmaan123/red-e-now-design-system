@@ -39,3 +39,10 @@ coverage/
 # ── Misc ──
 .cache/
 .temp/
+
+# ── Cloudflare/nitro local build cache ──
+.wrangler/
+
+# ── Playwright ──
+test-results/
+playwright-report/

@@ -90,7 +90,7 @@ describe("appointmentsApi", () => {
 
       expect(mockApi).toHaveBeenCalledWith("/appointments");
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe(1);
+      expect(result[0]?.id).toBe(1);
     });
   });
 

@@ -88,7 +88,7 @@ describe("handoffApi", () => {
     it("sends undefined note when not provided", async () => {
       await signoff(42, "John Smith");
 
-      const call = mockApi.mock.calls[0];
+      const call = mockApi.mock.calls[0]!;
       const body = JSON.parse(call[1]!.body as string);
       expect(body.recipient_name).toBe("John Smith");
       expect(body.acknowledged).toBe(true);
