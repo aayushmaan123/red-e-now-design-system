@@ -26,9 +26,9 @@ export const Route = createFileRoute("/")({
 });
 
 const steps: Step[] = [
-  { n: "01", title: "It arrives", body: "The desk logs each delivery against your unit. You get a notification with the carrier and tracking number.", Icon: ArrivesIcon },
-  { n: "02", title: "You pick a slot", body: "Choose a 15-minute pickup window that suits you, today or later in the week.", Icon: SlotIcon },
-  { n: "03", title: "Walk in, walk out", body: "Your packages are pulled and waiting. Verify, sign on the desk screen, done.", Icon: HandoffIcon },
+  { n: "01", title: "It arrives", body: "The desk logs each delivery against your unit. It shows up on your home screen with the carrier and tracking number.", Icon: ArrivesIcon },
+  { n: "02", title: "You pick a slot", body: "Choose a pickup window that suits you, today or later in the week. Move or cancel it if plans change.", Icon: SlotIcon },
+  { n: "03", title: "Walk in, walk out", body: "Your packages are pulled and waiting. Check in, the desk verifies who you are and records the handoff, done.", Icon: HandoffIcon },
 ];
 
 const audiences: Audience[] = [
@@ -42,7 +42,7 @@ const audiences: Audience[] = [
   {
     eyebrow: "Front desk",
     title: "One board for every pickup today",
-    points: ["Register a package in a few keystrokes", "Prep queue ordered by pickup time", "Verified handoff with a digital receipt"],
+    points: ["Register a package in a few keystrokes", "Prep queue ordered by pickup time", "Verified handoff with a receipt and audit trail"],
     cta: { to: "/staff/login", label: "Staff sign in" },
     direction: "right",
   },

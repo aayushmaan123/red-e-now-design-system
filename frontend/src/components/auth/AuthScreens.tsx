@@ -18,6 +18,12 @@ import { useAuth } from "@/hooks/useAuth";
 
 type Role = "resident" | "staff";
 
+/**
+ * Demo sign-in hints (seed accounts and the building code). Always on in local
+ * development; on a hosted build only when VITE_DEMO_HINTS=true was set at build time.
+ */
+const SHOW_DEMO_HINTS = import.meta.env.DEV || import.meta.env["VITE_DEMO_HINTS"] === "true";
+
 /** Inline text link used across auth screens: foreground text, underline turns red on hover. */
 const textLink = "font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-sm";
 
@@ -200,11 +206,11 @@ export function LoginScreen({ role }: { role: Role }) {
         </div>
       </form>
 
-      {/* Demo credentials — local development builds only */}
-      {import.meta.env.DEV && <div className="mt-6 rounded-md border border-border bg-card px-3.5 py-3">
+      {/* Demo credentials — local dev, or a hosted demo built with VITE_DEMO_HINTS=true */}
+      {SHOW_DEMO_HINTS && <div className="mt-6 rounded-md border border-border bg-card px-3.5 py-3">
         <p className={labelClass}>Demo accounts</p>
         <p className="mt-1.5 font-mono text-[12px] leading-relaxed text-muted-foreground">
-          staff@redenow.com · jane@redenow.com<br />password123
+          {role === "staff" ? "staff@redenow.com" : "jane@redenow.com"}<br />password123
         </p>
       </div>}
     </AuthFrame>
@@ -295,14 +301,20 @@ export function SignUpScreen() {
           )}
         </Button>
       </form>
+
+      {/* Demo building code — same visibility rule as the demo accounts on the sign-in screen */}
+      {SHOW_DEMO_HINTS && <div className="mt-6 rounded-md border border-border bg-card px-3.5 py-3">
+        <p className={labelClass}>Demo building code</p>
+        <p className="mt-1.5 font-mono text-[12px] leading-relaxed text-muted-foreground">REDENOW</p>
+      </div>}
     </AuthFrame>
   );
 }
 
 /**
- * Password help. Self-service email reset needs an email provider, which the
- * MVP does not have yet, so this screen tells people the real path instead of
- * pretending to send a link.
+ * Password help. There is no email provider, so nothing here pretends to send
+ * a link. Residents get a temporary password from the front desk (staff issue
+ * it from the Residents page); staff go through their administrator.
  */
 export function RecoveryScreen({ role }: { role: Role }) {
   return (
@@ -312,7 +324,7 @@ export function RecoveryScreen({ role }: { role: Role }) {
       subtitle={
         role === "staff"
           ? "Staff passwords are reset by your building administrator."
-          : "Self-service password reset is not available yet."
+          : "The front desk can reset your password in person."
       }
       footer={
         <Link
@@ -330,7 +342,7 @@ export function RecoveryScreen({ role }: { role: Role }) {
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           {role === "staff"
             ? "Contact the administrator who set up your desk account and ask them to issue a new password."
-            : "Contact your building management for help getting back into your account. Emailed reset links are coming in a later release."}
+            : "Stop by the front desk and ask for a password reset. Once they confirm who you are, they will give you a temporary password to sign in with. Reset links are not sent by email."}
         </p>
       </div>
     </AuthFrame>
