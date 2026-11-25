@@ -3,7 +3,7 @@
  */
 import { History } from "lucide-react";
 import { Card, EmptyState } from "@/components/common";
-import { useStaff } from "./StaffContext";
+import { BuildingName, useStaff } from "./StaffContext";
 import { toReceipt } from "./StaffTypes";
 import { ReceiptCard } from "./StaffReceiptCard";
 
@@ -14,7 +14,7 @@ export function StaffHistory() {
     <>
       <div className="mb-7 animate-fade-in">
         <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-          Oakwood Residences / Management
+          <BuildingName /> / Management
         </p>
         <h1 className="font-display text-[38px] font-semibold leading-none">
           History

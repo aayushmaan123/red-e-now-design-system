@@ -4,7 +4,7 @@
 import { Archive, ChevronRight, PackagePlus, ClipboardList, Search, Package } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button, Card, EmptyState, StatCard, StatusBadge } from "@/components/common";
-import { useStaff } from "./StaffContext";
+import { BuildingName, useStaff } from "./StaffContext";
 import { STAT_DEFS } from "./StaffTypes";
 
 export function StaffOverview() {
@@ -23,7 +23,7 @@ export function StaffOverview() {
           transition={{ duration: 0.5 }}
         >
           <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-            Oakwood Residences <span className="mx-2">/</span> {date}
+            <BuildingName /> <span className="mx-2">/</span> {date}
           </p>
           <h1 className="font-display text-[38px] font-semibold leading-none sm:text-[48px]">
             Welcome back, {user?.name.split(" ")[0] || "Team"}

@@ -2,7 +2,7 @@
  * StaffPackages — package table with search, status filter, sort.
  */
 import { Table, SearchField, StatusBadge, formatArrived } from "@/components/common";
-import { useStaff, STATUS_OPTIONS } from "./StaffContext";
+import { BuildingName, useStaff, STATUS_OPTIONS } from "./StaffContext";
 import type { PackageRecord, PackageStatus } from "@/api/packagesApi";
 import type { Column } from "@/components/common";
 
@@ -34,7 +34,7 @@ export function StaffPackages() {
     <>
       <div className="mb-7 animate-fade-in">
         <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-          Oakwood Residences / Management
+          <BuildingName /> / Management
         </p>
         <h1 className="font-display text-[38px] font-semibold leading-none">
           Packages

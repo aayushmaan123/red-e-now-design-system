@@ -135,6 +135,8 @@ export interface StaffState {
 
   /* Scheduling settings */
   schedulingSettings: SchedulingSettings | null;
+  /** Building name from the API; empty until settings have loaded. */
+  buildingName: string;
   setSchedulingSettings: (v: SchedulingSettings | null) => void;
   settingsBusy: boolean;
   settingsMessage: string;
@@ -177,6 +179,16 @@ export function useStaff(): StaffState {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useStaff must be used inside <StaffProvider>");
   return ctx;
+}
+
+/**
+ * The building's name as stored in the `buildings` table
+ * (delivered with GET /api/scheduling/settings). Renders a quiet
+ * placeholder for the moment before settings load.
+ */
+export function BuildingName() {
+  const { buildingName } = useStaff();
+  return <>{buildingName || "Building"}</>;
 }
 
 /* ────────────────────────────────────────────── */
@@ -763,7 +775,8 @@ export function StaffProvider({ children }: { children: ReactNode }) {
     appointments, appointmentsLoading, appointmentsError, fetchAppointments,
     activeAppointments, todaysAppointments, todaysPickups,
     prepQueue, checkedInAppointments, completedToday, now, todayKey,
-    schedulingSettings, setSchedulingSettings, settingsBusy, settingsMessage,
+    schedulingSettings, buildingName: schedulingSettings?.building_name ?? "",
+    setSchedulingSettings, settingsBusy, settingsMessage,
     saveSchedulingSettings,
     handoffTarget, setHandoffTarget, handoffBusyId, handoffError,
     signoffId, setSignoffId, signoffName, setSignoffName,

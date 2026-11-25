@@ -3,7 +3,7 @@
  */
 import { LogOut } from "lucide-react";
 import { Avatar, Button, Card, ThemeTabs } from "@/components/common";
-import { useStaff } from "./StaffContext";
+import { BuildingName, useStaff } from "./StaffContext";
 
 export function StaffAccount() {
   const { user, logout } = useStaff();
@@ -24,7 +24,7 @@ export function StaffAccount() {
         </div>
 
         <p className="mt-6 text-sm text-muted-foreground">
-          Oakwood Residences · Management
+          <BuildingName /> · Management
         </p>
 
         <div className="mt-6 flex items-center justify-between rounded-lg border border-border bg-background p-4">

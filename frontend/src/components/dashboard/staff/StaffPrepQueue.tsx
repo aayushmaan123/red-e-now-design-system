@@ -4,7 +4,7 @@
  */
 import { Archive, MapPin, Timer } from "lucide-react";
 import { Button, Card, EmptyState } from "@/components/common";
-import { useStaff } from "./StaffContext";
+import { BuildingName, useStaff } from "./StaffContext";
 import { pickupUrgency, formatTime } from "./StaffTypes";
 
 export function StaffPrepQueue() {
@@ -17,7 +17,7 @@ export function StaffPrepQueue() {
     <>
       <div className="mb-7 animate-fade-in">
         <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-          Oakwood Residences / Management
+          <BuildingName /> / Management
         </p>
         <h1 className="font-display text-[38px] font-semibold leading-none">
           Preparation Queue

@@ -2,6 +2,8 @@ import { api } from "./client";
 
 export interface SchedulingSettings {
   building_id: number;
+  /** Building name from the `buildings` table (read-only here). */
+  building_name: string;
   open_time: string;
   close_time: string;
   slot_minutes: number;
@@ -28,7 +30,7 @@ export async function getSchedulingSettings(): Promise<SchedulingSettings> {
 }
 
 export async function updateSchedulingSettings(
-  settings: Omit<SchedulingSettings, "building_id">,
+  settings: Omit<SchedulingSettings, "building_id" | "building_name">,
 ): Promise<void> {
   await api<{ success: boolean; message: string }>(
     "/scheduling/settings",

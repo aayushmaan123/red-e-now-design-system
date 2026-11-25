@@ -1,7 +1,7 @@
 /**
  * Barrel exports for the staff dashboard module.
  */
-export { StaffProvider, useStaff, CARRIERS, STATUS_OPTIONS, NEXT_STATUS } from "./StaffContext";
+export { StaffProvider, useStaff, BuildingName, CARRIERS, STATUS_OPTIONS, NEXT_STATUS } from "./StaffContext";
 export { StaffSidebar } from "./StaffSidebar";
 export { StaffHeader } from "./StaffHeader";
 export { StaffOverview } from "./StaffOverview";

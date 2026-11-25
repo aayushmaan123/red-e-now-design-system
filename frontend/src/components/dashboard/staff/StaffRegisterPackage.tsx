@@ -3,7 +3,7 @@
  * Glassmorphism card with premium dark-mode styling.
  */
 import { Card, Button, TextInput } from "@/components/common";
-import { useStaff, CARRIERS } from "./StaffContext";
+import { BuildingName, useStaff, CARRIERS } from "./StaffContext";
 
 export function StaffRegisterPackage() {
   const {
@@ -17,7 +17,7 @@ export function StaffRegisterPackage() {
     <>
       <div className="mb-7 animate-fade-in">
         <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-          Oakwood Residences / Management
+          <BuildingName /> / Management
         </p>
         <h1 className="font-display text-[38px] font-semibold leading-none">
           Register Package
@@ -31,10 +31,11 @@ export function StaffRegisterPackage() {
         <form onSubmit={handleRegister} className="space-y-5 p-6">
           {/* Carrier */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium">
+            <label htmlFor="reg-carrier" className="mb-1.5 block text-sm font-medium">
               Carrier <span className="text-primary">*</span>
             </label>
             <select
+              id="reg-carrier"
               value={regCarrier}
               onChange={(e) => setRegCarrier(e.target.value)}
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -56,10 +57,12 @@ export function StaffRegisterPackage() {
 
           {/* Resident */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium">
+            <label htmlFor="reg-resident" className="mb-1.5 block text-sm font-medium">
               Resident <span className="text-primary">*</span>
             </label>
             <select
+              id="reg-resident"
+              required
               value={regResidentId}
               onChange={(e) => setRegResidentId(e.target.value)}
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -94,8 +97,8 @@ export function StaffRegisterPackage() {
           />
 
           {/* Error / Success */}
-          {regError && <p className="text-sm text-primary">{regError}</p>}
-          {regSuccess && <p className="text-sm text-success">Package registered successfully!</p>}
+          {regError && <p role="alert" className="text-sm text-primary">{regError}</p>}
+          {regSuccess && <p role="status" className="text-sm text-success">Package registered.</p>}
 
           {/* Submit */}
           <Button type="submit" fullWidth disabled={regLoading}>

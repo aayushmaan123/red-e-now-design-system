@@ -7,6 +7,7 @@
 import { ConfirmPrompt } from "@/components/common";
 import {
   StaffProvider,
+  BuildingName,
   useStaff,
   StaffSidebar,
   StaffHeader,
@@ -60,7 +61,7 @@ function StaffFallback() {
   return (
     <div className="mb-7 animate-fade-in">
       <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-        Oakwood Residences / Management
+        <BuildingName /> / Management
       </p>
       <h1 className="font-display text-[38px] font-semibold leading-none">
         {section}

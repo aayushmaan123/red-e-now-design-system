@@ -2,7 +2,7 @@
  * StaffPickupSettings — configure pickup hours and capacity.
  */
 import { Card, Button } from "@/components/common";
-import { useStaff } from "./StaffContext";
+import { BuildingName, useStaff } from "./StaffContext";
 
 export function StaffPickupSettings() {
   const {
@@ -14,7 +14,7 @@ export function StaffPickupSettings() {
     <div className="space-y-6">
       <div className="animate-fade-in">
         <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-          Oakwood Residences / Management
+          <BuildingName /> / Management
         </p>
         <h2 className="font-display text-[38px] font-semibold leading-none">
           Pickup Settings
