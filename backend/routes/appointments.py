@@ -7,10 +7,21 @@ from mysql.connector import Error
 from services.database import get_db_connection
 from routes.packages import add_audit
 from routes.scheduling import read_settings, time_text
+from utils.clock import building_now, check_in_opens_at, local_iso, utc_iso
 
 appointments_bp = Blueprint("appointments", __name__)
 
 # Settings loaded from MySQL.
+
+# DATETIME columns holding building-local wall-clock times.
+WALL_CLOCK_FIELDS = (
+    "pickup_start",
+    "pickup_end",
+    "checked_in_at",
+    "identity_verified_at",
+    "acknowledged_at",
+    "handed_off_at",
+)
 
 
 def fail(code, message, status):
@@ -22,9 +33,22 @@ def fail(code, message, status):
 
 def serialize(row):
     result = dict(row)
-    for key in ("pickup_start", "pickup_end", "created_at"):
-        if isinstance(result.get(key), datetime):
-            result[key] = result[key].isoformat()
+
+    start = row.get("pickup_start")
+    end = row.get("pickup_end")
+    if isinstance(start, datetime) and isinstance(end, datetime):
+        # Tell the resident app when check-in opens, so the rule
+        # lives in one place (utils/clock.py).
+        result["check_in_opens_at"] = local_iso(
+            check_in_opens_at(start, end)
+        )
+
+    for key in WALL_CLOCK_FIELDS:
+        if key in result:
+            result[key] = local_iso(result[key])
+
+    if "created_at" in result:
+        result["created_at"] = utc_iso(result["created_at"])
 
     if row.get("status") == "completed":
         result["handoff_status"] = "Completed"
@@ -44,8 +68,10 @@ def appointment_list(cursor, where="", params=()):
     cursor.execute("""
         SELECT a.id, a.package_id, a.resident_id,
                a.pickup_start, a.pickup_end, a.status, a.created_at,
-            a.checked_in_at, a.identity_verified_at,
-            a.acknowledged_at, a.handed_off_at,
+               a.checked_in_at, a.identity_verified_at,
+               a.identity_verified_by, a.recipient_name,
+               a.acknowledged_at, a.handed_off_at,
+               a.signed_off_by, a.signoff_note,
                p.tracking_code, p.carrier_name, p.location_code,
                p.status AS package_status, p.has_exception,
                u.name AS resident_name, u.unit AS resident_unit
@@ -153,8 +179,10 @@ def create_appointment():
         opening_dt = datetime.combine(start.date(), opening)
         closing_dt = datetime.combine(start.date(), closing)
 
+        # A slot stays bookable until it ends, so a resident who is
+        # already downstairs can book the window that is in progress.
         if (
-            start <= datetime.now()
+            end <= building_now()
             or start.weekday() >= 5
             or start < opening_dt
             or end > closing_dt
@@ -163,7 +191,7 @@ def create_appointment():
             connection.rollback()
             return fail(
                 "VALIDATION_ERROR",
-                "Choose a future weekday slot within scheduling hours.",
+                "Choose an open weekday slot within scheduling hours.",
                 400,
             )
 
@@ -341,7 +369,7 @@ def cancel_appointment(appointment_id):
 
         cutoff = timedelta(minutes=settings["cancellation_cutoff_minutes"])
 
-        if datetime.now() >= pickup_start - cutoff:
+        if building_now() >= pickup_start - cutoff:
             connection.rollback()
             return fail(
                 "CANCELLATION_CUTOFF",
@@ -482,7 +510,7 @@ def reschedule_appointment(appointment_id):
             minutes=settings["cancellation_cutoff_minutes"]
         )
 
-        if datetime.now() >= old_start - cutoff:
+        if building_now() >= old_start - cutoff:
             connection.rollback()
             return fail(
                 "RESCHEDULE_CUTOFF",
@@ -504,7 +532,7 @@ def reschedule_appointment(appointment_id):
         closing_dt = datetime.combine(new_start.date(), closing)
 
         if (
-            new_start <= datetime.now()
+            new_end <= building_now()
             or new_start.weekday() >= 5
             or new_start < opening_dt
             or new_end > closing_dt
@@ -514,7 +542,7 @@ def reschedule_appointment(appointment_id):
             connection.rollback()
             return fail(
                 "VALIDATION_ERROR",
-                "Choose a future weekday slot within scheduling hours.",
+                "Choose an open weekday slot within scheduling hours.",
                 400,
             )
 

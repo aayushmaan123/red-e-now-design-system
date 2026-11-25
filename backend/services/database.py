@@ -23,6 +23,9 @@ def get_db_connection():
             "database": Config.DB_NAME,
             "user": Config.DB_USER,
             "password": Config.DB_PASSWORD,
+            # Read and write TIMESTAMP columns as UTC on every host, so
+            # arrived_at / changed_at are true instants (see utils/clock.py).
+            "time_zone": "+00:00",
         }
 
         # Hosted databases (PlanetScale) require TLS.

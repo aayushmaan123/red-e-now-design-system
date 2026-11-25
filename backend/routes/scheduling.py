@@ -5,6 +5,12 @@ from flask_jwt_extended import get_jwt, jwt_required
 from mysql.connector import Error
 
 from services.database import get_db_connection
+from utils.clock import (
+    building_now,
+    building_timezone,
+    building_today,
+    local_iso,
+)
 
 scheduling_bp = Blueprint("scheduling", __name__)
 
@@ -20,10 +26,12 @@ def error(code, message, status):
 
 def read_settings(cursor):
     cursor.execute("""
-        SELECT building_id, open_time, close_time, slot_minutes,
-               default_capacity, cancellation_cutoff_minutes
-        FROM scheduling_settings
-        WHERE building_id = %s
+        SELECT s.building_id, b.name AS building_name,
+               s.open_time, s.close_time, s.slot_minutes,
+               s.default_capacity, s.cancellation_cutoff_minutes
+        FROM scheduling_settings AS s
+        JOIN buildings AS b ON b.id = s.building_id
+        WHERE s.building_id = %s
     """, (BUILDING_ID,))
     return cursor.fetchone()
 
@@ -40,12 +48,17 @@ def time_text(value):
 def settings_json(row):
     return {
         "building_id": row["building_id"],
+        "building_name": row["building_name"],
         "open_time": time_text(row["open_time"]),
         "close_time": time_text(row["close_time"]),
         "slot_minutes": row["slot_minutes"],
         "default_capacity": row["default_capacity"],
         "cancellation_cutoff_minutes":
             row["cancellation_cutoff_minutes"],
+        # Pickup times are building-local. Clients use these to compare
+        # against the building's clock instead of the viewer's.
+        "timezone": str(building_timezone()),
+        "building_now": local_iso(building_now()),
     }
 
 
@@ -129,6 +142,10 @@ def update_settings():
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
 
+        # Pickup times are stored in building-local time, so compare
+        # against the building's clock rather than the database's NOW().
+        now = building_now()
+
         # Lock the settings row so simultaneous updates are serialized.
         cursor.execute("""
             SELECT building_id, open_time, close_time,
@@ -149,9 +166,9 @@ def update_settings():
             SELECT pickup_start, pickup_end
             FROM pickup_appointments
             WHERE status = 'scheduled'
-              AND pickup_start > NOW()
+              AND pickup_start > %s
             FOR UPDATE
-        """)
+        """, (now,))
         future_appointments = cursor.fetchall()
 
         for appointment in future_appointments:
@@ -204,10 +221,10 @@ def update_settings():
         cursor.execute("""
             SELECT pickup_start
             FROM pickup_slots
-            WHERE pickup_start > NOW()
+            WHERE pickup_start > %s
             ORDER BY pickup_start
             FOR UPDATE
-        """)
+        """, (now,))
         future_slots = [row["pickup_start"] for row in cursor.fetchall()]
 
         for slot_start in future_slots:
@@ -231,8 +248,8 @@ def update_settings():
         cursor.execute("""
             UPDATE pickup_slots
             SET capacity = %s
-            WHERE pickup_start > NOW()
-        """, (capacity,))
+            WHERE pickup_start > %s
+        """, (capacity, now))
 
         connection.commit()
 
@@ -268,7 +285,9 @@ def available_slots():
     if selected_date.weekday() >= 5:
         return jsonify({"success": True, "slots": []}), 200
 
-    if selected_date < date.today():
+    now = building_now()
+
+    if selected_date < building_today():
         return jsonify({"success": True, "slots": []}), 200
 
     connection = None
@@ -317,7 +336,9 @@ def available_slots():
         duration = timedelta(minutes=settings["slot_minutes"])
 
         while current + duration <= closing:
-            if current > datetime.now():
+            # Offer the slot that is in progress too; it stays
+            # bookable until it ends (matches POST /api/appointments).
+            if current + duration > now:
                 booked = counts.get(current, 0)
                 capacity = capacities.get(
                     current, settings["default_capacity"]

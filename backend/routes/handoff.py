@@ -1,11 +1,10 @@
-from datetime import datetime
-
 from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 from mysql.connector import Error
 
 from services.database import get_db_connection
 from routes.packages import add_audit
+from utils.clock import building_now, check_in_opens_at
 
 
 handoff_bp = Blueprint("handoff", __name__)
@@ -124,22 +123,25 @@ def run_handoff(appointment_id, operation):
                 409,
             )
 
-        now = datetime.now()
+        # Building-local wall-clock time, never the server's own clock.
+        now = building_now()
 
         if operation == "check-in":
             if appointment["checked_in_at"] is not None:
                 connection.rollback()
                 return fail("ALREADY_CHECKED_IN", "Already checked in.", 409)
 
-            if not (
-                appointment["pickup_start"]
-                <= now
-                <= appointment["pickup_end"]
-            ):
+            opens_at = check_in_opens_at(
+                appointment["pickup_start"],
+                appointment["pickup_end"],
+            )
+
+            if not (opens_at <= now <= appointment["pickup_end"]):
                 connection.rollback()
                 return fail(
                     "OUTSIDE_PICKUP_WINDOW",
-                    "Check-in is allowed only during the booked pickup window.",
+                    "Check-in opens shortly before your pickup window "
+                    "and closes when the window ends.",
                     409,
                 )
 
