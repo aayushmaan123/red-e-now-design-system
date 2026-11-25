@@ -1,9 +1,10 @@
 
 import os
+import secrets
 from datetime import timedelta
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 
@@ -14,12 +15,23 @@ from routes.packages import packages_bp
 from routes.residents import residents_bp
 from routes.appointments import appointments_bp
 from routes.scheduling import scheduling_bp
+from services.database import DatabaseUnavailable, get_db_connection
 from utils.rate_limit import limiter
 
 
 # Grab our local settings from the .env file.
 # This keeps passwords and secret keys out of the code.
 load_dotenv()
+
+# The API cannot do anything useful without these.
+REQUIRED_SETTINGS = ("JWT_SECRET_KEY", "DB_HOST", "DB_NAME", "DB_USER")
+
+
+def missing_settings():
+    return [
+        name for name in REQUIRED_SETTINGS
+        if not os.getenv(name, "").strip()
+    ]
 
 
 def create_app():
@@ -28,11 +40,19 @@ def create_app():
 
     # JWT is what keeps users logged in when they make API requests.
     # We need a secret key so nobody can fake a login token.
-    app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
+    #
+    # A missing setting must not crash the import: on a serverless host
+    # that turns every request into an opaque 500. The app still starts
+    # and answers every /api request with a clear 503 instead (see
+    # require_configuration below). The throwaway key is never used to
+    # issue a token because no request gets past that check.
+    app.config["JWT_SECRET_KEY"] = (
+        os.getenv("JWT_SECRET_KEY", "").strip() or secrets.token_urlsafe(48)
+    )
 
-    if not app.config["JWT_SECRET_KEY"]:
-        raise RuntimeError(
-            "JWT_SECRET_KEY is missing from the .env file."
+    if missing_settings():
+        app.logger.error(
+            "Missing configuration: %s", ", ".join(missing_settings())
         )
 
     # How long a login lasts before the user must sign in again.
@@ -44,14 +64,21 @@ def create_app():
     # Our current Vite frontend runs on port 8080.
     # FRONTEND_ORIGIN may list several origins separated by commas
     # (e.g. local dev + the Vercel production URL).
+    # A wildcard is never accepted. To allow preview deployments, set
+    # FRONTEND_ORIGIN_REGEX to one explicit pattern, for example
+    # https://red-e-now-[a-z0-9-]+-yourteam\.vercel\.app
     frontend_origins = [
-        origin.strip()
+        origin.strip().rstrip("/")
         for origin in os.getenv(
             "FRONTEND_ORIGIN",
             "http://localhost:8080"
         ).split(",")
-        if origin.strip()
+        if origin.strip() and "*" not in origin
     ]
+
+    origin_pattern = os.getenv("FRONTEND_ORIGIN_REGEX", "").strip()
+    if origin_pattern and origin_pattern not in ("*", ".*", "^.*$"):
+        frontend_origins.append(origin_pattern)
 
     CORS(
         app,
@@ -79,6 +106,22 @@ def create_app():
     app.register_blueprint(handoff_bp)
     app.register_blueprint(scheduling_bp)
 
+    # Refuse to serve the API until it is configured, and say what is
+    # missing (names only, never values).
+    @app.before_request
+    def require_configuration():
+        missing = missing_settings()
+        if missing and request.method != "OPTIONS":
+            return jsonify({
+                "success": False,
+                "error": {
+                    "code": "NOT_CONFIGURED",
+                    "message": "The API is missing configuration: "
+                               + ", ".join(missing) + "."
+                }
+            }), 503
+        return None
+
     # A quick way to check that the backend is running.
     @app.route("/api/health", methods=["GET"])
     def health():
@@ -86,6 +129,37 @@ def create_app():
             "success": True,
             "message": "RED-E-NOW backend is running."
         }), 200
+
+    # Same, plus one round trip to MySQL. Used after a deploy.
+    @app.route("/api/health/db", methods=["GET"])
+    def health_db():
+        connection = get_db_connection()
+        try:
+            cursor = connection.cursor()
+            cursor.execute("SELECT COUNT(*) FROM buildings")
+            cursor.fetchone()
+            cursor.close()
+        finally:
+            connection.close()
+
+        return jsonify({
+            "success": True,
+            "message": "Database connection is working."
+        }), 200
+
+    # The database could not be reached (wrong settings, TLS, paused
+    # instance). Routes that do not handle this themselves end up here.
+    @app.errorhandler(DatabaseUnavailable)
+    def database_unavailable(error):
+        app.logger.error("Database unavailable: %s", error)
+        return jsonify({
+            "success": False,
+            "error": {
+                "code": "DATABASE_UNAVAILABLE",
+                "message": "The database is not reachable right now. "
+                           "Try again in a moment."
+            }
+        }), 503
 
     # Give the frontend a clean JSON response for missing pages.
     @app.errorhandler(404)

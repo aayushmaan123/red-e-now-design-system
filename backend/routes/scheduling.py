@@ -226,25 +226,29 @@ def update_settings():
             ORDER BY pickup_start
             FOR UPDATE
         """, (now,))
-        future_slots = [row["pickup_start"] for row in cursor.fetchall()]
+        cursor.fetchall()
 
-        for slot_start in future_slots:
-            cursor.execute("""
+        # One query for every future slot (not one per slot: a week of
+        # slots would be over a hundred round trips to a hosted database).
+        cursor.execute("""
+            SELECT COALESCE(MAX(slot.booked), 0) AS most_booked
+            FROM (
                 SELECT COUNT(*) AS booked
                 FROM pickup_appointments
-                WHERE pickup_start = %s
-                  AND status = 'scheduled'
-            """, (slot_start,))
-            booked = cursor.fetchone()["booked"]
+                WHERE status = 'scheduled'
+                  AND pickup_start > %s
+                GROUP BY pickup_start
+            ) AS slot
+        """, (now,))
 
-            if booked > capacity:
-                connection.rollback()
-                return error(
-                    "EXISTING_BOOKINGS",
-                    "Capacity is below existing future bookings. "
-                    "Reschedule those appointments first.",
-                    409,
-                )
+        if cursor.fetchone()["most_booked"] > capacity:
+            connection.rollback()
+            return error(
+                "EXISTING_BOOKINGS",
+                "Capacity is below existing future bookings. "
+                "Reschedule those appointments first.",
+                409,
+            )
 
         cursor.execute("""
             UPDATE pickup_slots

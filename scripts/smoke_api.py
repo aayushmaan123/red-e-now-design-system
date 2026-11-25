@@ -19,7 +19,7 @@ What it checks
 
 The script only uses the public API, so it leaves one throwaway resident
 ("Smoke Test ...", unit ZZ9) and one package behind per run. Restore demo
-data with:  python scripts/db_bootstrap.py --reset --seed
+data with:  python scripts/db_bootstrap.py --reset
 
 Standard library only. Exit code 0 when every check passes.
 """
@@ -101,7 +101,12 @@ def main():
     print("\nHealth")
     status, body = api.call("GET", "/health")
     if not check("GET /health", status == 200 and body.get("success") is True, f"status={status}"):
-        print("\nBackend is not reachable; stopping.")
+        print("\nBackend is not reachable or not configured; stopping.")
+        print(f"  {code_of(body) or ''} {(body.get('error') or {}).get('message', '')}".rstrip())
+        return 1
+    status, body = api.call("GET", "/health/db")
+    if not check("GET /health/db (database round trip)", status == 200 and body.get("success") is True, f"status={status} {code_of(body) or ''}"):
+        print("\nThe API is up but cannot reach its database; stopping.")
         return 1
 
     # ── Auth ──────────────────────────────────────────────────
@@ -179,6 +184,11 @@ def main():
     status, body = api.call("GET", "/scheduling/settings", token=resident_token)
     settings = body.get("settings", {})
     check("settings include the building name", status == 200 and bool(settings.get("building_name")), settings.get("building_name", ""))
+    unchanged = {key: settings.get(key) for key in ("open_time", "close_time", "slot_minutes", "default_capacity", "cancellation_cutoff_minutes")}
+    status, body = api.call("PUT", "/scheduling/settings", unchanged, token=resident_token)
+    check("resident cannot change settings -> 403", status == 403, f"status={status}")
+    status, body = api.call("PUT", "/scheduling/settings", unchanged, token=staff_token)
+    check("staff saves settings (unchanged values)", status == 200, f"status={status} {code_of(body) or ''}")
 
     # The API decides what "today" is (building time), so probe a window of dates.
     earliest_slots, later_day, later_slots = [], None, []

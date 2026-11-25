@@ -1,0 +1,9 @@
+# Keep local-only files out of Vercel deployments of the API.
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+Procfile
