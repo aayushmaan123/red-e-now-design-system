@@ -44,6 +44,17 @@ def building_today():
     return building_now().date()
 
 
+def is_pickup_day(day):
+    """Whether the front desk hands out packages on this date.
+
+    Monday to Friday by default. Set PICKUP_WEEKENDS=true to open Saturday
+    and Sunday too (the hosted demo does, so it can be shown on any day).
+    """
+    if day.weekday() < 5:
+        return True
+    return os.getenv("PICKUP_WEEKENDS", "false").strip().lower() == "true"
+
+
 def check_in_opens_at(pickup_start, pickup_end):
     """Earliest wall-clock time a resident may check in for a slot."""
     return pickup_start - (pickup_end - pickup_start) * EARLY_CHECK_IN_SLOTS

@@ -9,6 +9,7 @@ from utils.clock import (
     building_now,
     building_timezone,
     building_today,
+    is_pickup_day,
     local_iso,
 )
 
@@ -179,7 +180,7 @@ def update_settings():
             day_close = datetime.combine(start.date(), closing)
 
             if (
-                start.weekday() >= 5
+                not is_pickup_day(start)
                 or start < day_open
                 or end > day_close
                 or (start - day_open).total_seconds()
@@ -282,7 +283,7 @@ def available_slots():
     except ValueError:
         return error("VALIDATION_ERROR", "Use YYYY-MM-DD for date.", 400)
 
-    if selected_date.weekday() >= 5:
+    if not is_pickup_day(selected_date):
         return jsonify({"success": True, "slots": []}), 200
 
     now = building_now()

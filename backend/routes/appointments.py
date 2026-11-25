@@ -7,7 +7,13 @@ from mysql.connector import Error
 from services.database import get_db_connection
 from routes.packages import add_audit
 from routes.scheduling import read_settings, time_text
-from utils.clock import building_now, check_in_opens_at, local_iso, utc_iso
+from utils.clock import (
+    building_now,
+    check_in_opens_at,
+    is_pickup_day,
+    local_iso,
+    utc_iso,
+)
 
 appointments_bp = Blueprint("appointments", __name__)
 
@@ -183,7 +189,7 @@ def create_appointment():
         # already downstairs can book the window that is in progress.
         if (
             end <= building_now()
-            or start.weekday() >= 5
+            or not is_pickup_day(start)
             or start < opening_dt
             or end > closing_dt
             or (start - opening_dt).total_seconds() % (duration * 60) != 0
@@ -191,7 +197,7 @@ def create_appointment():
             connection.rollback()
             return fail(
                 "VALIDATION_ERROR",
-                "Choose an open weekday slot within scheduling hours.",
+                "Choose an open pickup slot within front desk hours.",
                 400,
             )
 
@@ -533,7 +539,7 @@ def reschedule_appointment(appointment_id):
 
         if (
             new_end <= building_now()
-            or new_start.weekday() >= 5
+            or not is_pickup_day(new_start)
             or new_start < opening_dt
             or new_end > closing_dt
             or (new_start - opening_dt).total_seconds()
@@ -542,7 +548,7 @@ def reschedule_appointment(appointment_id):
             connection.rollback()
             return fail(
                 "VALIDATION_ERROR",
-                "Choose an open weekday slot within scheduling hours.",
+                "Choose an open pickup slot within front desk hours.",
                 400,
             )
 
