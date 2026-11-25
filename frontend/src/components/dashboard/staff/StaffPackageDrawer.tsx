@@ -4,7 +4,7 @@
  * location, an inline edit form, audit history and a status-advance button.
  */
 import {
-  Button, Card, Drawer, StatusBadge, TextInput,
+  Button, Card, Drawer, StatusBadge, TextInput, formatArrived,
 } from "@/components/common";
 import { useStaff } from "./StaffContext";
 import { NEXT_STATUS } from "./StaffContext";
@@ -87,7 +87,7 @@ export function StaffPackageDrawer() {
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Arrived
             </p>
-            <p className="mt-1 text-sm">{drawerPkg.arrived_at}</p>
+            <p className="mt-1 text-sm">{formatArrived(drawerPkg.arrived_at)}</p>
           </div>
 
           {/* Edit form */}

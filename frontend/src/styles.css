@@ -5,10 +5,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Red-E Now Design System v4 — "Bold Dark Ops"
- * Dark-first control-room UI. One signal red, flat data surfaces, bezel only on
- * primary actions and the pickup-board frame. Full contract: .claude/DESIGN.md
- * Tokens tuned in .claude/design/token-playground.html.
+ * Red-E Now Design System v5 — Linear-style.
+ * Inter throughout, sentence-case headings with tight tracking, hairline borders,
+ * quiet neutrals and one signal red. Three themes: dark (default), light, red.
  */
 
 @theme inline {
@@ -49,7 +48,7 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
   --font-display: "Inter", system-ui, sans-serif;
-  --font-sans: "Barlow Condensed", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --color-success: var(--success);
   --color-info: var(--info);
@@ -76,107 +75,154 @@
   --default-transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-/* Light theme (opt-in) */
+/*
+ * Themes — Linear-style neutrals, one signal red.
+ *   light  → :root
+ *   dark   → .dark (default)
+ *   red    → .dark.theme-red
+ */
+
+/* Light */
 :root {
-  --background: #f8fcf4;
-  --foreground: #151712;
+  --background: #fbfbfc;
+  --foreground: #0d0e10;
   --card: #ffffff;
-  --card-foreground: #151712;
+  --card-foreground: #0d0e10;
   --popover: #ffffff;
-  --popover-foreground: #151712;
+  --popover-foreground: #0d0e10;
   --primary: #dc0000;
   --primary-foreground: #ffffff;
-  --primary-hover: #c60000;
-  --secondary: #f1f5ed;
-  --secondary-foreground: #151712;
-  --muted: #f1f5ed;
-  --muted-foreground: #61645e;
-  /* subtle-foreground (both themes): placeholders, disabled states, kbd hints and separators ONLY, never content text (3.5:1 in light) */
-  --subtle-foreground: #848781;
-  --accent: #e9ede5;
-  --accent-foreground: #151712;
+  --primary-hover: #c20000;
+  --secondary: #f3f4f6;
+  --secondary-foreground: #0d0e10;
+  --muted: #f3f4f6;
+  --muted-foreground: #5d6169;
+  /* subtle-foreground: placeholders, disabled, kbd hints, separators ONLY */
+  --subtle-foreground: #8b8f97;
+  --accent: #ebedf0;
+  --accent-foreground: #0d0e10;
   --destructive: #dc0000;
   --destructive-foreground: #ffffff;
-  --destructive-hover: #c60000;
-  --border: #dfe3db;
-  --border-strong: #cfd2cb;
-  --input: #cfd2cb;
+  --destructive-hover: #c20000;
+  --border: #e6e7eb;
+  --border-strong: #d6d8dd;
+  --input: #d6d8dd;
   --ring: rgb(220 0 0 / 40%);
   --success: #1b9247;
   --info: #0f74c5;
   --prepared: #c85d00;
   --warning: #cd8800;
-  /* *-foreground = status text on its 13% tint; darkened in light to reach 4.5:1 */
   --warning-foreground: #8f5f00;
   --success-foreground: #17773a;
   --prepared-foreground: #a34c00;
   --info-foreground: #0d69b2;
-  --tint: 13%;
+  --tint: 11%;
   --bezel-ring: 8%;
   --bezel-highlight: 14%;
-  --bezel-shadow: 19%;
-  --overlay: rgb(21 23 18 / 40%);
-  --shadow-tone: rgb(0 0 0 / 8%);
-  --sidebar: #ffffff;
-  --sidebar-foreground: #151712;
+  --bezel-shadow: 16%;
+  --overlay: rgb(13 14 16 / 35%);
+  --shadow-tone: rgb(13 14 16 / 7%);
+  --sidebar: #f6f7f8;
+  --sidebar-foreground: #0d0e10;
   --sidebar-primary: #dc0000;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e9ede5;
-  --sidebar-accent-foreground: #151712;
-  --sidebar-border: #dfe3db;
+  --sidebar-accent: #ebedf0;
+  --sidebar-accent-foreground: #0d0e10;
+  --sidebar-border: #e6e7eb;
   --sidebar-ring: rgb(220 0 0 / 40%);
-  --rim-glow: 0.3;
+  --rim-glow: 0.25;
+  --particle-opacity: 0.14;
 }
 
-/* Dark theme (default) */
+/* Dark (default) */
 .dark {
-  --background: #020301;
-  --foreground: #f1f2ef;
-  --card: #050704;
-  --card-foreground: #f1f2ef;
-  --popover: #050704;
-  --popover-foreground: #f1f2ef;
+  --background: #08090a;
+  --foreground: #f7f8f8;
+  --card: #0f1011;
+  --card-foreground: #f7f8f8;
+  --popover: #141516;
+  --popover-foreground: #f7f8f8;
   --primary: #e40000;
   --primary-foreground: #ffffff;
   --primary-hover: #cc0000;
-  --secondary: #0b0d08;
-  --secondary-foreground: #bcbfb8;
-  --muted: #0b0d08;
-  --muted-foreground: #bcbfb8;
-  --subtle-foreground: #878a84;
-  --accent: #11140f;
-  --accent-foreground: #f1f2ef;
+  --secondary: #141516;
+  --secondary-foreground: #d0d6e0;
+  --muted: #141516;
+  --muted-foreground: #8a8f98;
+  --subtle-foreground: #62666d;
+  --accent: #1c1d1f;
+  --accent-foreground: #f7f8f8;
   --destructive: #e40000;
   --destructive-foreground: #ffffff;
   --destructive-hover: #cc0000;
-  --border: #10130d;
-  --border-strong: #1b1e19;
-  --input: #1b1e19;
+  --border: #1e1f22;
+  --border-strong: #2b2c30;
+  --input: #2b2c30;
   --ring: rgb(228 0 0 / 50%);
-  --success: #47c86e;
-  --info: #46a6ef;
-  --prepared: #f67f2f;
-  --warning: #f3ba25;
-  --warning-foreground: #f3ba25;
-  --success-foreground: #47c86e;
-  --prepared-foreground: #f67f2f;
-  --info-foreground: #46a6ef;
+  --success: #4cc77a;
+  --info: #4ea7f0;
+  --prepared: #f5853a;
+  --warning: #f2bb2e;
+  --warning-foreground: #f2bb2e;
+  --success-foreground: #4cc77a;
+  --prepared-foreground: #f5853a;
+  --info-foreground: #4ea7f0;
   --tint: 13%;
-  --bezel-ring: 14%;
-  --bezel-highlight: 14%;
+  --bezel-ring: 10%;
+  --bezel-highlight: 10%;
   --bezel-shadow: 55%;
-  --overlay: rgb(0 0 0 / 75%);
-  --shadow-tone: rgb(0 0 0 / 55%);
-  --sidebar: #050704;
-  --sidebar-foreground: #f1f2ef;
+  --overlay: rgb(0 0 0 / 70%);
+  --shadow-tone: rgb(0 0 0 / 50%);
+  --sidebar: #090a0b;
+  --sidebar-foreground: #f7f8f8;
   --sidebar-primary: #e40000;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #11140f;
-  --sidebar-accent-foreground: #f1f2ef;
-  --sidebar-border: #10130d;
+  --sidebar-accent: #1c1d1f;
+  --sidebar-accent-foreground: #f7f8f8;
+  --sidebar-border: #1e1f22;
   --sidebar-ring: rgb(228 0 0 / 50%);
-  --rim-glow: 0.55;
+  --rim-glow: 0.5;
+  --particle-opacity: 0.2;
   color-scheme: dark;
+}
+
+/* Red — deep crimson surfaces; primary brightened and paired with dark text for 5:1+ */
+.dark.theme-red {
+  --background: #0c0405;
+  --foreground: #fbf2f2;
+  --card: #140708;
+  --card-foreground: #fbf2f2;
+  --popover: #1a090b;
+  --popover-foreground: #fbf2f2;
+  --primary: #ff4040;
+  --primary-foreground: #160203;
+  --primary-hover: #ff5c5c;
+  --secondary: #1a090b;
+  --secondary-foreground: #e9d3d4;
+  --muted: #1a090b;
+  --muted-foreground: #c5a3a6;
+  --subtle-foreground: #8e6a6d;
+  --accent: #250d10;
+  --accent-foreground: #fbf2f2;
+  --destructive: #ff4040;
+  --destructive-foreground: #160203;
+  --destructive-hover: #ff5c5c;
+  --border: #2a1114;
+  --border-strong: #3b191d;
+  --input: #3b191d;
+  --ring: rgb(255 64 64 / 55%);
+  --overlay: rgb(6 1 1 / 75%);
+  --shadow-tone: rgb(0 0 0 / 55%);
+  --sidebar: #0f0506;
+  --sidebar-foreground: #fbf2f2;
+  --sidebar-primary: #ff4040;
+  --sidebar-primary-foreground: #160203;
+  --sidebar-accent: #250d10;
+  --sidebar-accent-foreground: #fbf2f2;
+  --sidebar-border: #2a1114;
+  --sidebar-ring: rgb(255 64 64 / 55%);
+  --rim-glow: 0.6;
+  --particle-opacity: 0.28;
 }
 
 @layer base {
@@ -186,6 +232,8 @@
   body {
     font-family: var(--font-sans);
     font-size: 14px;
+    font-feature-settings: "cv01", "ss03";
+    letter-spacing: -0.006em;
     background-color: var(--color-background);
     color: var(--color-foreground);
     -webkit-font-smoothing: antialiased;
@@ -221,6 +269,7 @@
   animation: rim-orbit 8s linear infinite;
 }
 .hero-streaks { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; opacity: 0.6; }
+:root:not(.dark) .hero-streaks { opacity: 0.32; }
 .hero-streaks > i {
   position: absolute; left: 20%; width: 120%; transform: rotate(-24deg); transform-origin: left center;
   background: linear-gradient(90deg, transparent, var(--primary) 45%, transparent 90%);
@@ -286,6 +335,8 @@
   50% { opacity: 0.5; }
 }
 .animate-pulse-soft { animation: pulse-soft 1.5s ease-in-out infinite; }
+
+
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

@@ -1,5 +1,6 @@
 
 import os
+from datetime import timedelta
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify
@@ -33,18 +34,29 @@ def create_app():
             "JWT_SECRET_KEY is missing from the .env file."
         )
 
+    # How long a login lasts before the user must sign in again.
+    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(
+        hours=int(os.getenv("JWT_EXPIRES_HOURS", "12"))
+    )
+
     # Allow our React frontend to communicate with Flask.
     # Our current Vite frontend runs on port 8080.
-    frontend_origin = os.getenv(
-        "FRONTEND_ORIGIN",
-        "http://localhost:8080"
-    )
+    # FRONTEND_ORIGIN may list several origins separated by commas
+    # (e.g. local dev + the Vercel production URL).
+    frontend_origins = [
+        origin.strip()
+        for origin in os.getenv(
+            "FRONTEND_ORIGIN",
+            "http://localhost:8080"
+        ).split(",")
+        if origin.strip()
+    ]
 
     CORS(
         app,
         resources={
             r"/api/*": {
-                "origins": [frontend_origin]
+                "origins": frontend_origins
             }
         },
         allow_headers=["Content-Type", "Authorization"]

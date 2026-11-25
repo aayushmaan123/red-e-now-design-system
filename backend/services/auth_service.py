@@ -24,13 +24,15 @@ def authenticate_user(user, password):
     if role not in ("resident", "staff"):
         return None
 
+    return {
+        "access_token": issue_token(user)
+    }
+
+
+def issue_token(user):
     # Put the user's ID in the token.
     # The role can be checked by protected routes.
-    access_token = create_access_token(
+    return create_access_token(
         identity=str(user["id"]),
-        additional_claims={"role": role}
+        additional_claims={"role": user["role"]}
     )
-
-    return {
-        "access_token": access_token
-    }

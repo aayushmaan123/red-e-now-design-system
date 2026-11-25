@@ -4,7 +4,7 @@
  * Uses framer-motion layoutId so the active-item background pill
  * animates smoothly between nav items (spring physics, ~220 ms).
  */
-import { Sun, Moon, LogOut, X } from "lucide-react";
+import { LogOut, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/common";
 import { useStaff } from "./StaffContext";
@@ -67,11 +67,11 @@ function NavList({ layoutPrefix = "desktop" }: { layoutPrefix?: string }) {
 }
 
 export function StaffSidebar() {
-  const { toggle, isDark, logout, menu, setMenu } = useStaff();
+  const { logout, menu, setMenu } = useStaff();
 
   const header = (
     <div className="border-b border-border px-6 py-7">
-      <span className="font-display text-[29px] font-bold uppercase leading-none text-primary">
+      <span className="font-display text-[29px] font-bold leading-none text-primary">
         Red-E Now<span className="text-foreground">.</span>
       </span>
       <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -82,14 +82,6 @@ export function StaffSidebar() {
 
   const footer = (
     <div className="border-t border-border p-3 space-y-1">
-      <Button
-        variant="ghost"
-        className="w-full justify-start gap-3 px-3 text-muted-foreground"
-        onClick={toggle}
-      >
-        {isDark ? <Sun size={18} /> : <Moon size={18} />}
-        {isDark ? "Light Mode" : "Dark Mode"}
-      </Button>
       <Button
         variant="ghost"
         className="w-full justify-start gap-3 px-3 text-muted-foreground"

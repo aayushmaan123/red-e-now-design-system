@@ -16,7 +16,7 @@ export function StaffHistory() {
         <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
           Oakwood Residences / Management
         </p>
-        <h1 className="font-display text-[38px] font-semibold uppercase leading-none">
+        <h1 className="font-display text-[38px] font-semibold leading-none">
           History
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
@@ -24,7 +24,7 @@ export function StaffHistory() {
         </p>
       </div>
 
-      <h2 className="mb-4 font-display text-[23px] font-semibold uppercase animate-fade-in">
+      <h2 className="mb-4 font-display text-[23px] font-semibold animate-fade-in">
         Completed Today
       </h2>
 

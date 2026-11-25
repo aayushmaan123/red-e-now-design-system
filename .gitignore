@@ -4,3 +4,8 @@ venv/
 .venv/
 node_modules/
 __pycache__/
+
+# Local tooling / secrets
+start_demo.bat
+.cc-stage/
+.playwright-mcp/

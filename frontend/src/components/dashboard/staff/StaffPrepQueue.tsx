@@ -19,7 +19,7 @@ export function StaffPrepQueue() {
         <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
           Oakwood Residences / Management
         </p>
-        <h1 className="font-display text-[38px] font-semibold uppercase leading-none">
+        <h1 className="font-display text-[38px] font-semibold leading-none">
           Preparation Queue
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
@@ -45,7 +45,7 @@ export function StaffPrepQueue() {
                   <MapPin size={20} strokeWidth={1.8} />
                   <div className="min-w-0">
                     <p className="font-mono text-[10px] uppercase tracking-wider opacity-80">Location</p>
-                    <p className="truncate font-display text-xl font-semibold uppercase leading-tight">
+                    <p className="truncate font-display text-xl font-semibold leading-tight">
                       {appointment.location_code || "Unassigned"}
                     </p>
                   </div>

@@ -16,7 +16,7 @@ class Config:
     # This controls which frontend is allowed to call our API
     FRONTEND_ORIGIN = os.getenv(
         "FRONTEND_ORIGIN",
-        "http://localhost:5173"
+        "http://localhost:8080"
     )
 
     # These values will be provided by the database teammate
@@ -25,6 +25,11 @@ class Config:
     DB_NAME = os.getenv("DB_NAME", "")
     DB_USER = os.getenv("DB_USER", "")
     DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+
+    # Set DB_SSL=true for hosted MySQL (PlanetScale). DB_SSL_CA optionally
+    # points at a CA bundle, e.g. /etc/ssl/certs/ca-certificates.crt.
+    DB_SSL = os.getenv("DB_SSL", "False").lower() == "true"
+    DB_SSL_CA = os.getenv("DB_SSL_CA", "")
 
     # This secret is used to securely sign authentication tokens
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "")

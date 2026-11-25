@@ -8,13 +8,12 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   CalendarDays, Circle, CircleCheck, Clock3, LogIn, History, House,
-  Moon, Package, Sun, UserRound, LogOut, ArrowRight,
+  Package, Palette, UserRound, LogOut, ArrowRight,
   ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Avatar, Button, Card, EmptyState, PackageCard, StatusBadge, TabBar } from "@/components/common";
+import { Avatar, Button, Card, EmptyState, PackageCard, StatusBadge, TabBar, ThemeTabs } from "@/components/common";
 import { useAuth } from "@/hooks/useAuth";
-import { useTheme } from "@/hooks/useTheme";
 import { getMyPackages, type PackageRecord } from "@/api/packagesApi";
 import {
   getPickupSlots,
@@ -68,7 +67,7 @@ function PickupReceiptCard({ receipt, className }: { receipt: PickupReceipt; cla
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
-              <h3 className="font-display text-lg font-semibold uppercase leading-tight">Package Picked Up</h3>
+              <h3 className="font-display text-lg font-semibold leading-tight">Package Picked Up</h3>
               <StatusBadge status="picked_up" />
             </div>
             <p className="mt-2 text-sm font-medium">{receipt.carrierName}</p>
@@ -188,7 +187,6 @@ const tabs = [{ name: "Home", icon: House }, { name: "Packages", icon: Package }
 export function ResidentHome() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const { toggle, isDark } = useTheme();
   const [tab, setTab] = useState<(typeof tabs)[number]["name"]>("Home");
 
   /* ── Package data ── */
@@ -424,30 +422,12 @@ export function ResidentHome() {
           <motion.span
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="font-display text-[27px] font-bold uppercase leading-none text-primary"
+            className="font-display text-[27px] font-bold leading-none text-primary"
           >
             Red-E Now
           </motion.span>
           <div className="absolute right-6 flex items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="size-9 rounded-md p-0"
-              aria-label="Toggle theme"
-              onClick={toggle}
-            >
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={isDark ? "sun" : "moon"}
-                  initial={{ rotate: -90, opacity: 0 }}
-                  animate={{ rotate: 0, opacity: 1 }}
-                  exit={{ rotate: 90, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {isDark ? <Sun size={18} strokeWidth={1.8} /> : <Moon size={18} strokeWidth={1.8} />}
-                </motion.span>
-              </AnimatePresence>
-            </Button>
+            <ThemeTabs compact />
             <Button
               variant="ghost"
               size="sm"
@@ -472,7 +452,7 @@ export function ResidentHome() {
             transition={{ duration: 0.2 }}
             className="mb-8 text-center"
           >
-            <h1 className="font-display text-[37px] font-semibold uppercase leading-none sm:text-[44px]">
+            <h1 className="font-display text-[37px] font-semibold leading-none sm:text-[44px]">
               {tab === "Home" ? (
                 <>
                   Welcome back,{" "}
@@ -509,7 +489,7 @@ export function ResidentHome() {
                       <Avatar name={user?.name || "Resident"} />
                     </div>
                     <div>
-                      <p className="font-display text-xl font-semibold uppercase">{user?.name}</p>
+                      <p className="font-display text-xl font-semibold">{user?.name}</p>
                       <p className="mt-1 font-mono text-xs text-muted-foreground">{user?.email}</p>
                     </div>
                   </div>
@@ -521,17 +501,14 @@ export function ResidentHome() {
                     <div className="flex items-center justify-between p-5">
                       <div className="flex items-center gap-3">
                         <div className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
-                          {isDark ? <Moon size={17} /> : <Sun size={17} />}
+                          <Palette size={17} />
                         </div>
                         <div>
                           <p className="text-sm font-medium">Appearance</p>
-                          <p className="text-xs text-muted-foreground">{isDark ? "Dark" : "Light"} mode active</p>
+                          <p className="text-xs text-muted-foreground">Dark, light or red</p>
                         </div>
                       </div>
-                      <Button variant="secondary" size="sm" onClick={toggle} className="gap-2">
-                        {isDark ? <Sun size={15} /> : <Moon size={15} />}
-                        {isDark ? "Light" : "Dark"}
-                      </Button>
+                      <ThemeTabs />
                     </div>
                   </Card>
                 </motion.div>
@@ -593,7 +570,7 @@ export function ResidentHome() {
                     {/* Your Packages section */}
                     <section>
                       <div className="mb-3 flex items-center justify-between">
-                        <h2 className="font-display text-xl font-semibold uppercase">Your Packages</h2>
+                        <h2 className="font-display text-xl font-semibold">Your Packages</h2>
                         <span className="font-mono text-xs text-muted-foreground">
                           <span className="tabular-nums">{String(activePackages.length).padStart(2, "0")}</span>
                         </span>
@@ -634,7 +611,7 @@ export function ResidentHome() {
                     {/* Upcoming Pickups section */}
                     <section>
                       <div className="mb-3 flex items-center justify-between">
-                        <h2 className="font-display text-xl font-semibold uppercase">
+                        <h2 className="font-display text-xl font-semibold">
                           Upcoming Pickups
                         </h2>
                         <span className="font-mono text-xs text-muted-foreground">
@@ -723,7 +700,7 @@ export function ResidentHome() {
                 {tab === "Packages" && (
                   <section className="md:col-span-2">
                     <div className="mb-3 flex items-center justify-between">
-                      <h2 className="font-display text-xl font-semibold uppercase">Your Packages</h2>
+                      <h2 className="font-display text-xl font-semibold">Your Packages</h2>
                       <span className="font-mono text-xs text-muted-foreground">
                         <span className="tabular-nums">{String(activePackages.length).padStart(2, "0")}</span>
                       </span>
@@ -765,7 +742,7 @@ export function ResidentHome() {
                           <CalendarDays size={20} />
                         </div>
                         <div>
-                          <h2 className="font-display text-xl font-semibold uppercase">
+                          <h2 className="font-display text-xl font-semibold">
                             {reschedulingId !== null ? "Reschedule Pickup" : "Schedule a Package Pickup"}
                           </h2>
                           <p className="mt-1 text-sm text-muted-foreground">
@@ -952,7 +929,7 @@ export function ResidentHome() {
                     </Card>
 
                     <Card className="p-6">
-                      <h2 className="font-display text-xl font-semibold uppercase">
+                      <h2 className="font-display text-xl font-semibold">
                         Your Scheduled Pickups
                       </h2>
                       {upcomingAppointments.length === 0 ? (
@@ -1006,7 +983,7 @@ export function ResidentHome() {
                 {tab === "Pickups" && (
                   <section className="space-y-8 md:col-span-2">
                     <div>
-                      <h2 className="mb-3 font-display text-xl font-semibold uppercase">Scheduled Pickups</h2>
+                      <h2 className="mb-3 font-display text-xl font-semibold">Scheduled Pickups</h2>
                       {upcomingAppointments.length > 0 ? (
                         <motion.div
                           className="space-y-3"
@@ -1098,7 +1075,7 @@ export function ResidentHome() {
                     </div>
 
                     <div>
-                      <h2 className="mb-3 font-display text-xl font-semibold uppercase">Recent Pickups</h2>
+                      <h2 className="mb-3 font-display text-xl font-semibold">Recent Pickups</h2>
                       {recentPickups.length > 0 ? (
                         <motion.div
                           className="grid gap-3 md:grid-cols-2"

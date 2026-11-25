@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]):not([type='hidden']), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
 
 /** Uppercase micro-label used for column heads, nav groups, form labels and KPI labels. */
-export const labelClass = "font-display text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground";
+export const labelClass = "font-display text-[12px] font-medium text-muted-foreground";
 
 /** Focus ring shared by every interactive control. */
 const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
@@ -82,7 +82,7 @@ export function Button({ variant = "primary", size = "md", fullWidth, className,
 export function Wordmark({ className }: { className?: string }) {
   return <Link to="/" className={cn("inline-flex items-center gap-2.5 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring", className)}>
     <span aria-hidden="true" className="size-4 rounded-[3px] bg-primary" />
-    <span className="font-display text-lg font-semibold uppercase tracking-[0.02em] text-foreground">Red-E Now</span>
+    <span className="whitespace-nowrap font-display text-lg font-semibold tracking-[-0.015em] text-foreground">Red-E Now</span>
   </Link>;
 }
 
@@ -133,7 +133,7 @@ export type BadgeTone = keyof typeof toneStyle;
 /** Generic status pill: 22px, 13% tint, 6px dot, uppercase label. */
 export function Badge({ tone = "neutral", children, dot = true, className }: { tone?: BadgeTone; children: ReactNode; dot?: boolean; className?: string }) {
   return <span className={cn(
-    "inline-flex h-[22px] items-center gap-1.5 whitespace-nowrap rounded-sm px-2 font-display text-[11px] font-semibold uppercase tracking-[0.08em]",
+    "inline-flex h-[22px] items-center gap-1.5 whitespace-nowrap rounded-sm px-2 font-display text-[11px] font-semibold tracking-[-0.015em]",
     toneStyle[tone],
     className
   )}>
@@ -161,7 +161,7 @@ export function EmptyState({ icon: Icon, title, message, action }: { icon: Lucid
     <div className="mb-4 flex size-11 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
       <Icon size={20} strokeWidth={1.6} />
     </div>
-    {title && <strong className="mb-1 font-display text-sm font-semibold uppercase tracking-[0.04em] text-foreground">{title}</strong>}
+    {title && <strong className="mb-1 font-display text-sm font-semibold tracking-[-0.015em] text-foreground">{title}</strong>}
     <p className="max-w-[36ch] text-sm text-muted-foreground">{message}</p>
     {action && <div className="mt-5">{action}</div>}
   </div>;
@@ -204,7 +204,7 @@ export function Modal({ title, children, onClose, actions }: { title: string; ch
       role="dialog" aria-modal="true" aria-labelledby={titleId} onMouseDown={e => e.stopPropagation()}
       className="flex max-h-[min(85vh,640px)] w-full max-w-md flex-col overflow-hidden rounded-lg border border-border-strong bg-card outline-none">
       <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-5 py-4">
-        <h2 id={titleId} className="font-display text-lg font-semibold uppercase leading-tight tracking-[0.02em]">{title}</h2>
+        <h2 id={titleId} className="font-display text-lg font-semibold leading-tight tracking-[-0.015em]">{title}</h2>
         <Button variant="ghost" size="sm" aria-label="Close dialog" onClick={onClose} className="-mr-1.5 size-8 p-0"><X size={18}/></Button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">{children}</div>
@@ -253,7 +253,7 @@ export function TabBar({ items, activeTab, onTabChange, className }: { items: re
           onClick={() => onTabChange(item.name)}
           onKeyDown={e => handleKeyDown(e, i)}
           className={cn(
-            "relative flex h-full flex-col items-center justify-center gap-1 rounded-none border-none bg-transparent px-1 font-display text-[10px] font-medium uppercase tracking-[0.08em] transition-colors",
+            "relative flex h-full flex-col items-center justify-center gap-1 rounded-none border-none bg-transparent px-1 font-display text-[10px] font-medium tracking-[-0.015em] transition-colors",
             focusRing,
             activeTab === item.name ? "text-foreground" : "text-muted-foreground hover:text-foreground"
           )}>
@@ -291,7 +291,7 @@ export function PackageCard({ carrierName, trackingCode, status, arrivedAt, desc
       </div>
       {trackingCode && <p className="mt-1.5 truncate pl-[26px] font-mono text-[13px] text-foreground/90">{trackingCode}</p>}
       <p className="mt-1 pl-[26px] text-sm text-muted-foreground">
-        {description && <>{description} · </>}Arrived {arrivedAt}
+        {description && <>{description} · </>}Arrived {formatArrived(arrivedAt)}
       </p>
       {recipientName && <>
         <div className="my-3 border-t border-border" />
@@ -412,7 +412,7 @@ export function Drawer({ open, onClose, title, children, side = "right", width =
         className
       )}>
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
-          {title && <h2 className="font-display text-base font-semibold uppercase tracking-[0.04em]">{title}</h2>}
+          {title && <h2 className="font-display text-base font-semibold tracking-[-0.015em]">{title}</h2>}
           <Button variant="ghost" size="sm" aria-label="Close drawer" onClick={onClose} className="ml-auto size-8 p-0"><X size={18} /></Button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
@@ -481,7 +481,7 @@ export function StatCard({ icon: Icon, label, value, trend, trendLabel, classNam
       <p className={cn(labelClass, "truncate")}>{label}</p>
       <Icon size={15} strokeWidth={1.8} aria-hidden="true" className="shrink-0 text-muted-foreground" />
     </div>
-    <p className={cn("mt-3 font-display text-[44px] font-medium leading-none tracking-[-0.02em] tabular-nums sm:text-[52px]", tone === "alert" && "text-primary")}>
+    <p className={cn("mt-3 font-display text-[44px] font-medium leading-none tracking-[-0.022em] tabular-nums sm:text-[52px]", tone === "alert" && "text-primary")}>
       {rolls ? <RollingNumber value={value} /> : value}
     </p>
     {trend && trendLabel && <p className={cn(
@@ -509,7 +509,7 @@ export function SectionHeader({ eyebrow, title, actions, className }: { eyebrow?
   return <div className={cn("flex flex-wrap items-end justify-between gap-3", className)}>
     <div className="min-w-0">
       {eyebrow && <p className={labelClass}>{eyebrow}</p>}
-      <h2 className="mt-1 font-display text-2xl font-medium uppercase leading-none tracking-[-0.01em]">{title}</h2>
+      <h2 className="mt-1 font-display text-2xl font-medium leading-none tracking-[-0.01em]">{title}</h2>
     </div>
     {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
   </div>;
@@ -547,7 +547,7 @@ export function ConfirmPrompt({ title, message, confirmLabel = "Confirm", cancel
   return <div className="fixed inset-0 z-40 flex items-center justify-center bg-overlay p-4 animate-fade-in" onMouseDown={onCancel}>
     <div ref={panelRef} tabIndex={-1} role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={messageId} onMouseDown={e => e.stopPropagation()} className="w-full max-w-sm overflow-hidden rounded-lg border border-border-strong bg-card outline-none animate-fade-in">
       <div className="px-5 pb-5 pt-5">
-        <h2 id={titleId} className="font-display text-lg font-semibold uppercase leading-tight tracking-[0.02em]">{title}</h2>
+        <h2 id={titleId} className="font-display text-lg font-semibold leading-tight tracking-[-0.015em]">{title}</h2>
         <p id={messageId} className="mt-2 text-sm text-muted-foreground">{message}</p>
       </div>
       <div className="flex justify-end gap-2 border-t border-border bg-muted px-5 py-3">
@@ -558,4 +558,21 @@ export function ConfirmPrompt({ title, message, confirmLabel = "Confirm", cancel
       </div>
     </div>
   </div>;
+}
+export { ThemeTabs } from "./ThemeTabs";
+
+/**
+ * formatArrived — readable arrival time for API timestamps
+ * ("2026-11-24T17:33:22+00:00" → "Nov 24, 5:33 PM"). Non-date strings pass through.
+ */
+export function formatArrived(value: string | null | undefined): string {
+  if (!value) return "—";
+  if (!/^\d{4}-\d{2}-\d{2}/.test(value)) return value;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleString(undefined, {
+    month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }),
+    hour: "numeric", minute: "2-digit",
+  });
 }

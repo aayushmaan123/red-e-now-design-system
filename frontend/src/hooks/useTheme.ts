@@ -1,91 +1,70 @@
 /**
- * useTheme -- Hook for managing light/dark theme toggling.
+ * useTheme — shared theme state for Red-E Now.
  *
- * Supports three modes: "light", "dark", and "system" (follows OS preference).
- * The chosen mode is persisted in localStorage so it survives page reloads.
- * When set to "system", an OS media-query listener keeps the theme in sync
- * if the user changes their OS appearance while the app is open.
+ * Three themes: "dark" (default), "light", and "red".
+ * One module-level store backs every useTheme() call, so a switcher in the
+ * header and one in a settings card always agree.
  *
- * Theme application works by adding or removing the "dark" CSS class on
- * the <html> element, which Tailwind's `darkMode: "class"` strategy uses.
+ * DOM contract (styles.css):
+ *   dark  → <html class="dark">
+ *   light → <html>
+ *   red   → <html class="dark theme-red">   (red is a dark-family theme)
+ * The same logic runs as an inline script in __root.tsx before first paint.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
-type Theme = "light" | "dark" | "system";
+export type Theme = "dark" | "light" | "red";
+export const THEMES: readonly Theme[] = ["dark", "light", "red"] as const;
 
-/** localStorage key used to persist the user's theme preference. */
 const STORAGE_KEY = "rede-now-theme";
+const listeners = new Set<() => void>();
 
-/**
- * Reads the operating system's current color-scheme preference via
- * the `prefers-color-scheme` media query. Falls back to "light" during
- * server-side rendering where `window` is unavailable.
- */
-function getSystemTheme(): "light" | "dark" {
-  if (typeof window === "undefined") return "light";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+function readStored(): Theme {
+  if (typeof window === "undefined") return "dark";
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw === "light" || raw === "dark" || raw === "red") return raw;
+    // Legacy "system" value from the old two-theme toggle.
+    if (raw === "system") {
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+  } catch { /* storage unavailable */ }
+  return "dark";
 }
 
-/**
- * Applies the resolved theme by toggling the "dark" class on the
- * document's root <html> element. Tailwind uses this class to switch
- * between light and dark utility styles.
- */
-function applyTheme(resolved: "light" | "dark") {
+let current: Theme = readStored();
+
+function applyTheme(theme: Theme) {
   const root = document.documentElement;
-  if (resolved === "dark") {
-    root.classList.add("dark");
-  } else {
-    root.classList.remove("dark");
-  }
+  root.classList.toggle("dark", theme !== "light");
+  root.classList.toggle("theme-red", theme === "red");
 }
+
+if (typeof window !== "undefined") applyTheme(current);
+
+function setThemeGlobal(next: Theme) {
+  current = next;
+  applyTheme(next);
+  try { localStorage.setItem(STORAGE_KEY, next); } catch { /* storage unavailable */ }
+  listeners.forEach((fn) => fn());
+}
+
+function subscribe(fn: () => void) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+/** Inline pre-paint script for <head>; keep in sync with applyTheme(). */
+export const themeInitScript = `(function(){try{var t=localStorage.getItem('${STORAGE_KEY}');if(t==='system')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';var c=document.documentElement.classList;c.toggle('dark',t!=='light');c.toggle('theme-red',t==='red');}catch(e){}})();`;
 
 export function useTheme() {
-  // Initialize theme from localStorage; default to "dark" (the Bold Dark Ops
-  // default) if nothing is stored or if localStorage is unavailable.
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "dark";
-    try {
-      return (localStorage.getItem(STORAGE_KEY) as Theme) || "dark";
-    } catch {
-      return "dark";
-    }
-  });
-
-  // Resolve "system" to the actual OS preference; "light" and "dark" pass through.
-  const resolved = theme === "system" ? getSystemTheme() : theme;
-
-  // Whenever the resolved theme changes, apply it to the DOM immediately.
-  useEffect(() => {
-    applyTheme(resolved);
-  }, [resolved]);
-
-  // When the theme is set to "system", listen for OS-level color-scheme
-  // changes (e.g. the user toggles macOS/Windows dark mode) and re-apply
-  // the theme in real time. The listener is cleaned up if the user switches
-  // away from "system" or on unmount.
-  useEffect(() => {
-    if (theme !== "system") return;
-    const mql = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => applyTheme(getSystemTheme());
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, [theme]);
-
-  // Persist the chosen theme to localStorage and update React state.
-  const setTheme = useCallback((next: Theme) => {
-    setThemeState(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, next);
-    } catch { /* storage unavailable */ }
+  const theme = useSyncExternalStore(subscribe, () => current, () => "dark" as Theme);
+  const setTheme = useCallback((next: Theme) => setThemeGlobal(next), []);
+  // Cycles dark → light → red. Kept for older call sites.
+  const toggle = useCallback(() => {
+    setThemeGlobal(THEMES[(THEMES.indexOf(current) + 1) % THEMES.length] ?? "dark");
   }, []);
 
-  // Convenience toggle: flips between light and dark based on the current
-  // resolved value (so toggling from "system" picks the opposite of the OS theme).
-  const toggle = useCallback(() => {
-    setTheme(resolved === "dark" ? "light" : "dark");
-  }, [resolved, setTheme]);
-
-  return { theme, resolved, setTheme, toggle, isDark: resolved === "dark" } as const;
+  return { theme, resolved: theme, setTheme, toggle, isDark: theme !== "light" } as const;
 }

@@ -23,7 +23,7 @@ export function StaffHandoff() {
         <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
           Oakwood Residences / Management
         </p>
-        <h1 className="font-display text-[38px] font-semibold uppercase leading-none">
+        <h1 className="font-display text-[38px] font-semibold leading-none">
           Handoff
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
@@ -39,7 +39,7 @@ export function StaffHandoff() {
       {lastReceipt && (
         <section className="mb-8 max-w-xl" aria-live="polite">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-[23px] font-semibold uppercase text-success">
+            <h2 className="font-display text-[23px] font-semibold text-success">
               Pickup Confirmed
             </h2>
             <Button variant="ghost" size="sm" onClick={() => setLastReceipt(null)}>
@@ -84,7 +84,7 @@ export function StaffHandoff() {
               <MapPin size={20} strokeWidth={1.8} />
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-wider opacity-80">Storage location</p>
-                <p className="font-display text-xl font-semibold uppercase leading-tight">
+                <p className="font-display text-xl font-semibold leading-tight">
                   {appointment.location_code || "Unassigned"}
                 </p>
               </div>
@@ -136,7 +136,7 @@ export function StaffHandoff() {
       {completedToday.length > 0 && (
         <section className="mt-10 animate-fade-in">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-display text-[23px] font-semibold uppercase">Completed Today</h2>
+            <h2 className="font-display text-[23px] font-semibold">Completed Today</h2>
             <Button variant="ghost" size="sm" onClick={() => choose("History")}>View all</Button>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">

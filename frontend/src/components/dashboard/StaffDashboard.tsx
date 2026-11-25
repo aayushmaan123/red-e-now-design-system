@@ -19,6 +19,7 @@ import {
   StaffHistory,
   StaffPickupSettings,
   StaffAccount,
+  StaffResidents,
   StaffPackageDrawer,
 } from "./staff";
 
@@ -44,6 +45,8 @@ function SectionContent() {
       return <StaffHistory />;
     case "Pickup Settings":
       return <StaffPickupSettings />;
+    case "Residents":
+      return <StaffResidents />;
     case "Account":
       return <StaffAccount />;
     default:
@@ -59,7 +62,7 @@ function StaffFallback() {
       <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
         Oakwood Residences / Management
       </p>
-      <h1 className="font-display text-[38px] font-semibold uppercase leading-none">
+      <h1 className="font-display text-[38px] font-semibold leading-none">
         {section}
       </h1>
       <p className="mt-6 text-sm text-muted-foreground">Nothing here yet.</p>

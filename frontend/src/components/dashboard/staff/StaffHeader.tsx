@@ -1,12 +1,12 @@
 /**
  * StaffHeader — sticky top-bar for the staff dashboard.
  */
-import { Menu, Moon, Sun } from "lucide-react";
-import { Avatar, Button } from "@/components/common";
+import { Menu } from "lucide-react";
+import { Avatar, Button, ThemeTabs } from "@/components/common";
 import { useStaff } from "./StaffContext";
 
 export function StaffHeader() {
-  const { user, section, menu, setMenu, choose, toggle, isDark } = useStaff();
+  const { user, section, setMenu, choose } = useStaff();
 
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-card">
@@ -21,10 +21,10 @@ export function StaffHeader() {
           >
             <Menu size={21} />
           </Button>
-          <span className="font-display text-xl font-bold uppercase text-primary lg:hidden">
+          <span className="font-display text-xl font-bold text-primary lg:hidden">
             Red-E Now<span className="text-foreground">.</span>
           </span>
-          <span className="hidden font-display text-lg font-semibold uppercase lg:inline">
+          <span className="hidden font-display text-lg font-semibold lg:inline">
             {section}
           </span>
           <span className="hidden rounded bg-primary/10 px-2 py-1 font-mono text-[10px] uppercase text-primary sm:inline">
@@ -33,19 +33,8 @@ export function StaffHeader() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="size-9 rounded-md p-0 lg:hidden"
-            aria-label="Toggle theme"
-            onClick={toggle}
-          >
-            {isDark ? (
-              <Sun size={18} strokeWidth={1.8} />
-            ) : (
-              <Moon size={18} strokeWidth={1.8} />
-            )}
-          </Button>
+          <ThemeTabs compact className="sm:hidden" />
+          <ThemeTabs className="hidden sm:inline-flex" />
           <Button
             variant="ghost"
             size="sm"

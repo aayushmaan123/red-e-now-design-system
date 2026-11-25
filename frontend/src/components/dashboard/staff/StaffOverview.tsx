@@ -25,7 +25,7 @@ export function StaffOverview() {
           <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
             Oakwood Residences <span className="mx-2">/</span> {date}
           </p>
-          <h1 className="font-display text-[38px] font-semibold uppercase leading-none sm:text-[48px]">
+          <h1 className="font-display text-[38px] font-semibold leading-none sm:text-[48px]">
             Welcome back, {user?.name.split(" ")[0] || "Team"}
           </h1>
           <p className="mt-3 text-sm text-muted-foreground">Your building at a glance today.</p>
@@ -62,7 +62,7 @@ export function StaffOverview() {
         {/* Recent activity */}
         <section>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-display text-[23px] font-semibold uppercase">Recent Activity</h2>
+            <h2 className="font-display text-[23px] font-semibold">Recent Activity</h2>
             <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Latest updates</span>
           </div>
           {packages.length > 0 ? (
@@ -95,7 +95,7 @@ export function StaffOverview() {
 
         {/* Quick actions */}
         <section>
-          <h2 className="mb-4 font-display text-[23px] font-semibold uppercase">Quick Actions</h2>
+          <h2 className="mb-4 font-display text-[23px] font-semibold">Quick Actions</h2>
           <div className="space-y-3">
             {[
               { label: "Add Package", icon: PackagePlus, target: "Register Package" },

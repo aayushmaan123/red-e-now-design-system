@@ -118,7 +118,7 @@ export function WeekStripCalendar({
     <div className={cn("space-y-4", className)}>
       {/* ── Week navigation header ── */}
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-xl font-semibold uppercase">
+        <h2 className="font-display text-xl font-semibold">
           {format(weekStart, "MMM d")} – {format(weekEnd, "MMM d, yyyy")}
         </h2>
         <div className="flex items-center gap-1">
@@ -204,7 +204,7 @@ export function WeekStripCalendar({
       <Card className="animate-fade-in p-5">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <p className="font-display text-lg font-semibold uppercase">
+            <p className="font-display text-lg font-semibold">
               {format(selectedDate, "EEEE")}
             </p>
             <p className="font-mono text-xs text-muted-foreground">

@@ -13,6 +13,7 @@ export { StaffHandoff } from "./StaffHandoff";
 export { StaffHistory } from "./StaffHistory";
 export { StaffPickupSettings } from "./StaffPickupSettings";
 export { StaffAccount } from "./StaffAccount";
+export { StaffResidents } from "./StaffResidents";
 export { StaffPackageDrawer } from "./StaffPackageDrawer";
 export { HandoffBadge, ExceptionBadge } from "./StaffBadges";
 export { ReceiptCard } from "./StaffReceiptCard";

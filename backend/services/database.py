@@ -17,13 +17,22 @@ def get_db_connection():
 
     try:
         # Create a new connection to the Red-E Now MySQL database
-        connection = mysql.connector.connect(
-            host=Config.DB_HOST,
-            port=Config.DB_PORT,
-            database=Config.DB_NAME,
-            user=Config.DB_USER,
-            password=Config.DB_PASSWORD
-        )
+        options = {
+            "host": Config.DB_HOST,
+            "port": Config.DB_PORT,
+            "database": Config.DB_NAME,
+            "user": Config.DB_USER,
+            "password": Config.DB_PASSWORD,
+        }
+
+        # Hosted databases (PlanetScale) require TLS.
+        if Config.DB_SSL:
+            options["ssl_disabled"] = False
+            options["ssl_verify_identity"] = True
+            if Config.DB_SSL_CA:
+                options["ssl_ca"] = Config.DB_SSL_CA
+
+        connection = mysql.connector.connect(**options)
 
         # Return the connection so our services can use it
         return connection

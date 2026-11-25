@@ -1,7 +1,7 @@
 /**
  * StaffPackages — package table with search, status filter, sort.
  */
-import { Table, SearchField, StatusBadge } from "@/components/common";
+import { Table, SearchField, StatusBadge, formatArrived } from "@/components/common";
 import { useStaff, STATUS_OPTIONS } from "./StaffContext";
 import type { PackageRecord, PackageStatus } from "@/api/packagesApi";
 import type { Column } from "@/components/common";
@@ -15,7 +15,11 @@ const pkgColumns: Column<PackageRecord>[] = [
     header: "Status",
     render: (row: PackageRecord) => <StatusBadge status={row.status} />,
   },
-  { key: "arrived_at", header: "Arrived" },
+  {
+    key: "arrived_at",
+    header: "Arrived",
+    render: (row: PackageRecord) => <span className="text-muted-foreground">{formatArrived(row.arrived_at)}</span>,
+  },
 ];
 
 export function StaffPackages() {
@@ -32,7 +36,7 @@ export function StaffPackages() {
         <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
           Oakwood Residences / Management
         </p>
-        <h1 className="font-display text-[38px] font-semibold uppercase leading-none">
+        <h1 className="font-display text-[38px] font-semibold leading-none">
           Packages
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">

@@ -16,7 +16,7 @@ export function StaffPickupSettings() {
         <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
           Oakwood Residences / Management
         </p>
-        <h2 className="font-display text-[38px] font-semibold uppercase leading-none">
+        <h2 className="font-display text-[38px] font-semibold leading-none">
           Pickup Settings
         </h2>
         <p className="mt-3 text-sm text-muted-foreground">
