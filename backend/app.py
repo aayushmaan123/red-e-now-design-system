@@ -14,6 +14,7 @@ from routes.packages import packages_bp
 from routes.residents import residents_bp
 from routes.appointments import appointments_bp
 from routes.scheduling import scheduling_bp
+from utils.rate_limit import limiter
 
 
 # Grab our local settings from the .env file.
@@ -65,6 +66,9 @@ def create_app():
     # Turn on JWT authentication for protected routes.
     jwt = JWTManager(app)
 
+    # Per-IP limits on login and register (see utils/rate_limit.py).
+    limiter.init_app(app)
+
     # Connect all our API routes to the Flask application.
     # Auth handles login, packages handles package management,
     # and residents lets staff find real residents from MySQL.
@@ -105,6 +109,17 @@ def create_app():
                 "message": "This HTTP method is not allowed."
             }
         }), 405
+
+    # Too many login or signup attempts from one address.
+    @app.errorhandler(429)
+    def rate_limited(error):
+        return jsonify({
+            "success": False,
+            "error": {
+                "code": "RATE_LIMITED",
+                "message": "Too many attempts. Wait a minute and try again."
+            }
+        }), 429
 
     # Catch unexpected backend errors without exposing private details.
     @app.errorhandler(500)

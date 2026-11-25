@@ -15,11 +15,13 @@ from services.auth_service import authenticate_user, issue_token
 from utils.passwords import hash_password
 
 from utils.auth import role_required
+from utils.rate_limit import LOGIN_LIMIT, REGISTER_LIMIT, limiter
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 
 @auth_bp.route("/login", methods=["POST"])
+@limiter.limit(LOGIN_LIMIT, methods=["POST"])
 def login():
     # Make sure the frontend sends JSON.
     if not request.is_json:
@@ -136,6 +138,7 @@ def _public_user(user):
 
 
 @auth_bp.route("/register", methods=["POST"])
+@limiter.limit(REGISTER_LIMIT, methods=["POST"])
 def register():
     # Self-service resident signup, gated by the building's registration code.
     data = request.get_json(silent=True)
