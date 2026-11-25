@@ -217,7 +217,8 @@ export function ResidentHome() {
   const [appointmentBusy, setAppointmentBusy] = useState(false);
   const [bookingPackageId, setBookingPackageId] = useState("");
   const [bookingDate, setBookingDate] = useState("");
-  const [bookingTime, setBookingTime] = useState("09:00");
+  // Empty until the resident picks one of the slots the API offers for the date.
+  const [bookingTime, setBookingTime] = useState("");
 
   const [pickupSlots, setPickupSlots] = useState<PickupSlot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
@@ -282,7 +283,8 @@ export function ResidentHome() {
         carrierName: a.carrier_name || byPackage.get(a.package_id)?.carrier_name || "Package",
         trackingCode: a.tracking_code || byPackage.get(a.package_id)?.tracking_code || "—",
         description: byPackage.get(a.package_id)?.description || "",
-        pickedUpAt: a.pickup_start,
+        // The moment staff completed the handoff; the booked slot is the fallback.
+        pickedUpAt: a.handed_off_at ?? a.pickup_start,
       }));
     const covered = new Set(fromAppointments.map((r) => r.packageId));
     const fromPackages = packages
@@ -746,12 +748,12 @@ export function ResidentHome() {
                             {reschedulingId !== null ? "Reschedule Pickup" : "Schedule a Package Pickup"}
                           </h2>
                           <p className="mt-1 text-sm text-muted-foreground">
-                            Choose an available package and a weekday pickup slot.
+                            Choose an available package and an open pickup slot.
                           </p>
                         </div>
                       </div>
 
-                      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                      <div className="mt-6 grid gap-4 sm:grid-cols-2">
                         <label className="text-sm font-medium">
                           Package
                           <select
@@ -785,28 +787,12 @@ export function ResidentHome() {
                             className="mt-2 w-full rounded-md border border-border bg-background p-3 transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
                             min={new Date().toLocaleDateString("en-CA")}
                             value={bookingDate}
-                            onChange={(event) => setBookingDate(event.target.value)}
+                            onChange={(event) => {
+                              setBookingDate(event.target.value);
+                              // Times differ per date; pick again from that day's open slots.
+                              setBookingTime("");
+                            }}
                           />
-                        </label>
-
-                        <label className="text-sm font-medium">
-                          Pickup Time
-                          <select
-                            className="mt-2 w-full rounded-md border border-border bg-background p-3 transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
-                            value={bookingTime}
-                            onChange={(event) => setBookingTime(event.target.value)}
-                          >
-                            {Array.from({ length: 16 }, (_, index) => {
-                              const hour = 9 + Math.floor(index / 2);
-                              const minute = index % 2 ? "30" : "00";
-                              const time = `${String(hour).padStart(2, "0")}:${minute}`;
-                              return (
-                                <option key={time} value={time}>
-                                  {time}
-                                </option>
-                              );
-                            })}
-                          </select>
                         </label>
                       </div>
 
@@ -1006,7 +992,9 @@ export function ResidentHome() {
                           </AnimatePresence>
                           {upcomingAppointments.map((appointment) => {
                             const prepared = appointment.package_status === "prepared";
-                            const start = new Date(appointment.pickup_start).getTime();
+                            // Check-in opens a little before the window (the API decides when).
+                            const opensAt = appointment.check_in_opens_at ?? appointment.pickup_start;
+                            const start = new Date(opensAt).getTime();
                             const end = new Date(appointment.pickup_end).getTime();
                             const checkedIn = Boolean(appointment.checked_in_at);
                             return (
@@ -1032,7 +1020,7 @@ export function ResidentHome() {
                                   {prepared && !checkedIn && now < start && (
                                     <p className="mt-3 flex items-center gap-1.5 border-t border-border pt-3 text-sm text-muted-foreground">
                                       <Clock3 size={14} />
-                                      Check-in opens at {new Date(appointment.pickup_start).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                                      Check-in opens at {new Date(opensAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                                     </p>
                                   )}
 
@@ -1048,7 +1036,7 @@ export function ResidentHome() {
                                         {checkingInId === appointment.id ? "Checking in…" : "Check In"}
                                       </Button>
                                       <p className="mt-2 text-center text-xs text-muted-foreground">
-                                        You can check in during your pickup window.
+                                        Check in when you arrive at the front desk.
                                       </p>
                                     </div>
                                   )}

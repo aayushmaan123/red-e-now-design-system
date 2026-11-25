@@ -10,6 +10,8 @@ export interface PickupAppointment {
   pickup_end: string;
   status: AppointmentStatus;
   created_at: string;
+  /** Earliest building-local time the resident may check in (set by the API). */
+  check_in_opens_at?: string;
   tracking_code?: string;
   carrier_name?: string;
   resident_name?: string;
