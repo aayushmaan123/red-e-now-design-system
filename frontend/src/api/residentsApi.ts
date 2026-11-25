@@ -12,6 +12,7 @@ import { api } from "./client";
 export interface ResidentOption {
   id: number;
   name: string;
+  email?: string;
   unit: string | null;
 }
 
@@ -24,4 +25,26 @@ export async function getResidents(): Promise<ResidentOption[]> {
   }>("/residents");
 
   return response.residents;
+}
+
+export interface PasswordResetResult {
+  resident: ResidentOption;
+  /** Returned once by the API; only the hash is stored. */
+  temporary_password: string;
+}
+
+// Staff only: POST /api/residents/:id/reset-password.
+// Sets a temporary password for a resident who is locked out.
+export async function resetResidentPassword(
+  residentId: number,
+): Promise<PasswordResetResult> {
+  const response = await api<{ success: boolean } & PasswordResetResult>(
+    `/residents/${residentId}/reset-password`,
+    { method: "POST" },
+  );
+
+  return {
+    resident: response.resident,
+    temporary_password: response.temporary_password,
+  };
 }

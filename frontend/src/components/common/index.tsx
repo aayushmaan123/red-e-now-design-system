@@ -368,7 +368,13 @@ export function Table<T>({ columns, data, keyExtractor, sortKey, sortDir, onSort
           ? <tr><td colSpan={columns.length} className="border-t border-border px-3 py-10 text-center text-muted-foreground">{emptyMessage || "No data"}</td></tr>
           : data.map(row => (
             <tr key={keyExtractor(row)} onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={cn("border-t border-border transition-colors", onRowClick && "cursor-pointer hover:bg-muted")}>
+              // Clickable rows are keyboard-reachable: Tab to focus, Enter or Space to open.
+              tabIndex={onRowClick ? 0 : undefined}
+              onKeyDown={onRowClick ? (e) => {
+                if (e.target !== e.currentTarget) return; // let buttons inside the row handle their own keys
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onRowClick(row); }
+              } : undefined}
+              className={cn("border-t border-border transition-colors", onRowClick && "cursor-pointer hover:bg-muted focus-visible:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring")}>
               {columns.map(col => (
                 <td key={col.key} style={col.width ? { width: col.width } : undefined} className={cn("h-10 px-3", align(col.align))}>
                   {col.render ? col.render(row) : (row as Record<string, unknown>)[col.key] as ReactNode}
