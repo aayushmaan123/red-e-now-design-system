@@ -9,7 +9,21 @@ export interface SchedulingSettings {
   slot_minutes: number;
   default_capacity: number;
   cancellation_cutoff_minutes: number;
+  /** IANA zone of the building's clock, e.g. "America/New_York" (read-only). */
+  timezone?: string;
+  /**
+   * The building's current wall-clock time, "YYYY-MM-DDTHH:MM:SS" with no
+   * offset (read-only). Pickup times use the same clock, so `building_now.slice(0, 10)`
+   * is "today" at the front desk even when the viewer is in another time zone.
+   */
+  building_now?: string;
 }
+
+/** The fields staff can change in Pickup Settings. */
+export type SchedulingSettingsInput = Pick<
+  SchedulingSettings,
+  "open_time" | "close_time" | "slot_minutes" | "default_capacity" | "cancellation_cutoff_minutes"
+>;
 
 export interface PickupSlot {
   pickup_start: string;
@@ -30,7 +44,7 @@ export async function getSchedulingSettings(): Promise<SchedulingSettings> {
 }
 
 export async function updateSchedulingSettings(
-  settings: Omit<SchedulingSettings, "building_id" | "building_name">,
+  settings: SchedulingSettingsInput,
 ): Promise<void> {
   await api<{ success: boolean; message: string }>(
     "/scheduling/settings",
