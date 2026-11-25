@@ -1,0 +1,16 @@
+# Keep local-only and unrelated files out of Vercel deployments of the frontend.
+node_modules/
+.output/
+.wrangler/
+test-results/
+playwright-report/
+e2e/
+.env
+.env.*
+!.env.example
+
+# Sprint 1 leftovers that live in this folder but are not part of the app.
+backend/
+schema.sql
+seed.sql
+SPRINT-2-TEAMMATE-HANDOFF.txt

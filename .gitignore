@@ -9,3 +9,6 @@ __pycache__/
 start_demo.bat
 .cc-stage/
 .playwright-mcp/
+
+# Vercel project links (created by vercel link)
+.vercel/

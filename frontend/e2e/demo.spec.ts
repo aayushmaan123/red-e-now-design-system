@@ -9,7 +9,7 @@
  *
  * Needs the front desk to be open (a pickup slot in progress or coming up
  * today), because step 5 checks in for real. Every run creates one resident
- * and one package; `python scripts/db_bootstrap.py --reset --seed` clears them.
+ * and one package; `python scripts/db_bootstrap.py --reset` clears them.
  *
  * Controls are found by role and accessible name. If a redesign renames one
  * of them, update the name here in the same change.
