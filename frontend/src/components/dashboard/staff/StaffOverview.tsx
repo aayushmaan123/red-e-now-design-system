@@ -1,122 +1,173 @@
 /**
- * StaffOverview — dashboard home with stat cards, recent activity, quick actions.
+ * StaffOverview — the front desk at a glance: four live counts, who is waiting
+ * at the desk, what is still due today, and the newest arrivals.
+ * Every number is derived from the packages and appointments loaded in StaffContext.
  */
-import { Archive, ChevronRight, PackagePlus, ClipboardList, Search, Package } from "lucide-react";
-import { motion } from "framer-motion";
-import { Button, Card, EmptyState, StatCard, StatusBadge } from "@/components/common";
+import { ClipboardList, History, Inbox, Package, PackageCheck, PackagePlus } from "lucide-react";
+import { Button, EmptyState, KpiStrip, StatCard, StatusBadge, formatArrived } from "@/components/common";
+import type { PackageStatus } from "@/api/packagesApi";
+import { cn } from "@/lib/utils";
 import { BuildingName, useStaff } from "./StaffContext";
-import { STAT_DEFS } from "./StaffTypes";
+import { handoffStage } from "./StaffTypes";
+import { formatTime, greeting, plural } from "./format";
+import {
+  ErrorNote, ExceptionBadge, HandoffBadge, LoadError, LoadingRows, Mono, PageHeader, Panel, PanelHeader, focusRing,
+} from "./ui";
+
+const SCHEDULE_ROWS = 6;
+const ARRIVAL_ROWS = 7;
 
 export function StaffOverview() {
   const {
-    user, date, packages, todaysAppointments, completedToday,
-    choose, setDrawerPkg,
+    user, date, choose, setDrawerPkg, hasException,
+    allPackages, packagesLoaded, packagesError, loading, fetchPackages,
+    todaysAppointments, todaysPickups, prepQueue, checkedInAppointments, completedToday,
+    appointmentsLoaded, appointmentsError, appointmentsLoading, fetchAppointments,
   } = useStaff();
+
+  const waiting = allPackages.filter((p) => p.status === "received" || p.status === "available").length;
+  const schedule = todaysPickups.filter((a) => a.status !== "completed");
+  const atDesk = checkedInAppointments.length;
+
+  const count = (ready: boolean, value: number) => (ready ? value : "—");
 
   return (
     <>
-      {/* Hero header */}
-      <div className="relative mb-9">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-            <BuildingName /> <span className="mx-2">/</span> {date}
+      <PageHeader
+        title="Dashboard"
+        description={<>{greeting(user?.name)}. {date} at <BuildingName />.</>}
+        actions={
+          <Button size="sm" onClick={() => choose("Register Package")}>
+            <PackagePlus size={15} aria-hidden="true" /> Register package
+          </Button>
+        }
+      />
+
+      {packagesLoaded && packagesError && (
+        <ErrorNote className="mb-4" onRetry={fetchPackages}>Packages could not be refreshed: {packagesError}</ErrorNote>
+      )}
+      {appointmentsLoaded && appointmentsError && (
+        <ErrorNote className="mb-4" onRetry={fetchAppointments}>Pickups could not be refreshed: {appointmentsError}</ErrorNote>
+      )}
+
+      {atDesk > 0 && (
+        <Panel className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
+          <p className="flex min-w-0 items-center gap-2.5 text-sm">
+            <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-primary" />
+            <span>
+              <span className="font-medium">{plural(atDesk, "resident")} waiting at the desk.</span>{" "}
+              <span className="text-muted-foreground">
+                {checkedInAppointments.slice(0, 3).map((a) => a.resident_name).filter(Boolean).join(", ")}
+                {atDesk > 3 ? ` and ${atDesk - 3} more` : ""}
+              </span>
+            </span>
           </p>
-          <h1 className="font-display text-[38px] font-semibold leading-none sm:text-[48px]">
-            Welcome back, {user?.name.split(" ")[0] || "Team"}
-          </h1>
-          <p className="mt-3 text-sm text-muted-foreground">Your building at a glance today.</p>
-        </motion.div>
-      </div>
+          <Button size="sm" onClick={() => choose("Handoff")}>Open handoff</Button>
+        </Panel>
+      )}
 
-      {/* Stat cards */}
-      <motion.div
-        initial="hidden"
-        animate="show"
-        variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } }}
-        className="grid grid-cols-2 gap-3 sm:gap-5 xl:grid-cols-4"
-      >
-        {STAT_DEFS.map((s) => {
-          const count =
-            s.label === "Today's Pickups"
-              ? todaysAppointments.length
-              : s.label === "Completed Today"
-                ? completedToday.length
-                : packages.filter(s.filter).length;
-          return (
-            <motion.div
-              key={s.label}
-              variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }}
-            >
-              <StatCard icon={s.icon} label={s.label} value={count} />
-            </motion.div>
-          );
-        })}
-      </motion.div>
+      <KpiStrip className="rounded-md">
+        <StatCard variant="strip" icon={Package} label="Waiting packages" value={count(packagesLoaded, waiting)} />
+        <StatCard variant="strip" icon={ClipboardList} label="Pickups left today" value={count(appointmentsLoaded, todaysAppointments.length)} />
+        <StatCard variant="strip" icon={PackageCheck} label="To prepare" value={count(appointmentsLoaded, prepQueue.length)} />
+        <StatCard variant="strip" icon={History} label="Completed today" value={count(appointmentsLoaded, completedToday.length)} />
+      </KpiStrip>
 
-      {/* Recent activity + Quick actions */}
-      <div className="mt-10 grid gap-9 xl:grid-cols-[1.5fr_1fr]">
-        {/* Recent activity */}
-        <section>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-display text-[23px] font-semibold">Recent Activity</h2>
-            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Latest updates</span>
-          </div>
-          {packages.length > 0 ? (
-            <motion.div
-              className="space-y-2"
-              initial="hidden"
-              animate="show"
-              variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }}
-            >
-              {packages.slice(0, 4).map((p) => (
-                <motion.div
-                  key={p.id}
-                  variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
-                >
-                  <Card hover onClick={() => setDrawerPkg(p)} className="flex items-center gap-3 p-3">
-                    <Package size={16} className="shrink-0 text-primary" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{p.carrier_name} · {p.resident_name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{p.tracking_code}</p>
-                    </div>
-                    <StatusBadge status={p.status} />
-                  </Card>
-                </motion.div>
-              ))}
-            </motion.div>
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        {/* Today's schedule */}
+        <Panel className="overflow-hidden">
+          <PanelHeader
+            title="Today's schedule"
+            meta={appointmentsLoaded ? schedule.length : undefined}
+            action={<Button variant="ghost" size="sm" onClick={() => choose("Today's Pickups")}>View all</Button>}
+          />
+          {!appointmentsLoaded && appointmentsError ? (
+            <LoadError title="Could not load today's pickups" message={appointmentsError} onRetry={fetchAppointments} busy={appointmentsLoading} />
+          ) : !appointmentsLoaded ? (
+            <LoadingRows label="Loading today's pickups" />
+          ) : schedule.length === 0 ? (
+            <EmptyState
+              icon={ClipboardList}
+              title="Nothing left today"
+              message={completedToday.length > 0
+                ? `All of today's pickups are done (${completedToday.length} completed).`
+                : "No pickups are booked for the rest of today."}
+            />
           ) : (
-            <Card><EmptyState icon={Archive} message="No recent activity" /></Card>
+            <ul className="divide-y divide-border">
+              {schedule.slice(0, SCHEDULE_ROWS).map((a) => {
+                const stage = handoffStage(a);
+                return (
+                  <li key={a.id} className="flex items-center gap-4 px-4 py-2.5">
+                    <Mono className="w-[68px] shrink-0 text-[13px] text-foreground">{formatTime(a.pickup_start)}</Mono>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {a.resident_name}
+                        <Mono className="ml-2 font-normal text-muted-foreground">{a.resident_unit || "—"}</Mono>
+                      </p>
+                      <p className="truncate text-[13px] text-muted-foreground">
+                        {a.carrier_name} <Mono>{a.tracking_code}</Mono>
+                      </p>
+                    </div>
+                    <Mono className="hidden shrink-0 text-muted-foreground sm:block">{a.location_code || "No location"}</Mono>
+                    <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center">
+                      {hasException(a) && <ExceptionBadge />}
+                      {stage === "Not checked in"
+                        ? a.package_status && <StatusBadge status={a.package_status as PackageStatus} />
+                        : <HandoffBadge stage={stage} />}
+                    </div>
+                  </li>
+                );
+              })}
+              {schedule.length > SCHEDULE_ROWS && (
+                <li className="px-4 py-2.5 text-[13px] text-muted-foreground">
+                  {schedule.length - SCHEDULE_ROWS} more later today
+                </li>
+              )}
+            </ul>
           )}
-        </section>
+        </Panel>
 
-        {/* Quick actions */}
-        <section>
-          <h2 className="mb-4 font-display text-[23px] font-semibold">Quick Actions</h2>
-          <div className="space-y-3">
-            {[
-              { label: "Add Package", icon: PackagePlus, target: "Register Package" },
-              { label: "Today's Queue", icon: ClipboardList, target: "Today's Pickups" },
-              { label: "Search Resident", icon: Search, target: "Residents" },
-            ].map((a) => (
-              <Button
-                key={a.label}
-                variant="secondary"
-                size="lg"
-                fullWidth
-                onClick={() => choose(a.target)}
-                className="h-[60px] justify-start bg-card px-5 text-sm transition-colors hover:bg-secondary"
-              >
-                <a.icon size={19} className="text-primary" />
-                {a.label}
-                <ChevronRight size={17} className="ml-auto text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-              </Button>
-            ))}
-          </div>
-        </section>
+        {/* Latest arrivals */}
+        <Panel className="overflow-hidden">
+          <PanelHeader
+            title="Latest arrivals"
+            meta={packagesLoaded ? allPackages.length : undefined}
+            action={<Button variant="ghost" size="sm" onClick={() => choose("Packages")}>View all</Button>}
+          />
+          {!packagesLoaded && packagesError ? (
+            <LoadError title="Could not load packages" message={packagesError} onRetry={fetchPackages} busy={loading} />
+          ) : !packagesLoaded ? (
+            <LoadingRows label="Loading packages" />
+          ) : allPackages.length === 0 ? (
+            <EmptyState
+              icon={Inbox}
+              title="No packages yet"
+              message="Packages appear here as soon as they are registered."
+              action={<Button size="sm" onClick={() => choose("Register Package")}>Register package</Button>}
+            />
+          ) : (
+            <ul className="divide-y divide-border">
+              {allPackages.slice(0, ARRIVAL_ROWS).map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => setDrawerPkg(p)}
+                    className={cn("flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted focus-visible:bg-muted", focusRing, "focus-visible:-outline-offset-2")}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <Mono className="block truncate text-[13px] text-foreground">{p.tracking_code}</Mono>
+                      <span className="block truncate text-[13px] text-muted-foreground">
+                        {p.carrier_name} · {p.resident_name} · {formatArrived(p.arrived_at)}
+                      </span>
+                    </span>
+                    <StatusBadge status={p.status} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
       </div>
     </>
   );
