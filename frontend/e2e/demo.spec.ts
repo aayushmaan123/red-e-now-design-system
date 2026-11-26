@@ -303,9 +303,9 @@ test("resident and front desk complete a pickup end to end", async ({ browser, p
     await row.click();
     const drawer = staff.getByRole("dialog");
     await expect(drawer.getByText("Audit History")).toBeVisible();
-    for (const action of ["created", "signed off"]) {
-      await expect(drawer.getByText(action, { exact: true }).first()).toBeVisible();
-    }
+    // Human-readable timeline (describeAudit): "Registered", "Signed for by …"
+    await expect(drawer.getByText("Registered", { exact: true }).first()).toBeVisible();
+    await expect(drawer.getByText(/^Signed for/).first()).toBeVisible();
 
     // The resident sees the receipt in their history.
     await refreshResident(page, "Pickups");

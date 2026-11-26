@@ -1,10 +1,53 @@
 /**
- * StaffReceiptCard — compact completion receipt for a finished pickup.
+ * ReceiptRow — one finished pickup: who collected what, from where, and when.
+ * ReceiptCard wraps a single row in a bordered panel (lists use divide-y between rows).
  */
-import { Receipt } from "lucide-react";
-import { Card } from "@/components/common";
+import { Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { HandoffReceipt } from "./StaffTypes";
+import { formatDateTime } from "./format";
+import { Mono, Panel } from "./ui";
 
+export function ReceiptRow({
+  receipt,
+  showStaff = true,
+  className,
+}: {
+  receipt: HandoffReceipt;
+  /** Hide "Handed over by" when the staff member is not known yet. */
+  showStaff?: boolean;
+  className?: string;
+}) {
+  const when = formatDateTime(receipt.completedAt);
+  return (
+    <div className={cn("flex items-start gap-3 px-4 py-3", className)}>
+      <span className="tint-success mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-success-foreground">
+        <Check size={14} strokeWidth={2.2} aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
+          <p className="min-w-0 truncate text-sm font-medium">
+            {receipt.residentName}
+            <Mono className="ml-2 font-normal text-muted-foreground">{receipt.unit}</Mono>
+          </p>
+          {when !== "—" && <Mono className="shrink-0 text-muted-foreground">{when}</Mono>}
+        </div>
+        <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-[13px] text-muted-foreground">
+          <span>{receipt.carrier}</span>
+          <Mono className="break-all text-foreground">{receipt.tracking}</Mono>
+          <span aria-hidden="true">·</span>
+          <Mono>{receipt.location}</Mono>
+        </p>
+        <p className="mt-1 text-[13px] text-muted-foreground">
+          Received by <span className="text-foreground">{receipt.recipientName}</span>
+          {showStaff && <> · Handed over by <span className="text-foreground">{receipt.completedBy}</span></>}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** One pickup receipt in a flat panel; optional ring when it just completed. */
 export function ReceiptCard({
   receipt,
   highlight,
@@ -13,40 +56,13 @@ export function ReceiptCard({
   highlight?: boolean;
 }) {
   return (
-    <Card
-      className={`p-4 bg-card border-border ${
-        highlight
-          ? "ring-2 ring-success/30 shadow-[0_0_20px_rgba(34,197,94,0.1)]"
-          : ""
-      }`}
+    <Panel
+      className={cn(
+        "overflow-hidden",
+        highlight && "ring-2 ring-success/30 shadow-[0_0_20px_rgba(34,197,94,0.08)]",
+      )}
     >
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
-          <Receipt size={16} strokeWidth={1.8} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-medium">
-            {receipt.residentName}
-            <span className="ml-1.5 font-normal text-muted-foreground">
-              · Unit {receipt.unit}
-            </span>
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {receipt.carrier} · <span className="font-mono text-xs">{receipt.tracking}</span>
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>
-              Received by <span className="font-medium text-foreground">{receipt.recipientName}</span>
-            </span>
-            <span>
-              Completed by <span className="font-medium text-foreground">{receipt.completedBy}</span>
-            </span>
-            {receipt.completedAt !== "—" && (
-              <span>{new Date(receipt.completedAt).toLocaleString()}</span>
-            )}
-          </div>
-        </div>
-      </div>
-    </Card>
+      <ReceiptRow receipt={receipt} />
+    </Panel>
   );
 }

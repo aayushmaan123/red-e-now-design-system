@@ -1,5 +1,5 @@
 /**
- * StaffDashboard — thin layout shell.
+ * StaffDashboard — layout shell for the staff console.
  *
  * All state lives in StaffProvider (staff/StaffContext).
  * Each section is a focused component under staff/.
@@ -7,10 +7,10 @@
 import { ConfirmPrompt } from "@/components/common";
 import {
   StaffProvider,
-  BuildingName,
   useStaff,
   StaffSidebar,
   StaffHeader,
+  StaffCommandMenu,
   StaffOverview,
   StaffRegisterPackage,
   StaffPackages,
@@ -22,6 +22,8 @@ import {
   StaffAccount,
   StaffResidents,
   StaffPackageDrawer,
+  PageHeader,
+  sectionTitle,
 } from "./staff";
 
 /* ── Section router ── */
@@ -51,27 +53,11 @@ function SectionContent() {
     case "Account":
       return <StaffAccount />;
     default:
-      return <StaffFallback />;
+      return <PageHeader title={sectionTitle(section)} description="This section does not exist." />;
   }
 }
 
-/* ── Fallback for unbuilt sections ── */
-function StaffFallback() {
-  const { section } = useStaff();
-  return (
-    <div className="mb-7 animate-fade-in">
-      <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-        <BuildingName /> / Management
-      </p>
-      <h1 className="font-display text-[38px] font-semibold leading-none">
-        {section}
-      </h1>
-      <p className="mt-6 text-sm text-muted-foreground">Nothing here yet.</p>
-    </div>
-  );
-}
-
-/* ── Handoff confirmation modal ── */
+/* ── Handoff confirmation ── */
 function HandoffConfirm() {
   const { handoffTarget, setHandoffTarget, handoffBusyId, handleCompleteHandoff } =
     useStaff();
@@ -80,9 +66,9 @@ function HandoffConfirm() {
 
   return (
     <ConfirmPrompt
-      title="Complete Pickup"
+      title="Complete pickup"
       message={`Hand ${handoffTarget.carrier_name} package ${handoffTarget.tracking_code} from ${handoffTarget.location_code || "storage"} to ${handoffTarget.recipient_name || handoffTarget.resident_name} (Unit ${handoffTarget.resident_unit || "—"})? This can't be undone.`}
-      confirmLabel="Complete Pickup"
+      confirmLabel="Complete pickup"
       variant="primary"
       loading={handoffBusyId === handoffTarget.id}
       onConfirm={handleCompleteHandoff}
@@ -95,17 +81,22 @@ function HandoffConfirm() {
 
 /* ── Layout shell ── */
 function StaffLayout() {
+  const { section } = useStaff();
   return (
-    <div className="min-h-screen bg-background lg:pl-[252px]">
+    <div className="min-h-screen bg-background lg:pl-[232px]">
       <StaffSidebar />
       <StaffHeader />
 
-      <main className="mx-auto max-w-7xl px-6 pb-16 pt-9 lg:px-10 lg:pt-12">
-        <SectionContent />
+      <main className="mx-auto w-full max-w-[1240px] px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pt-8">
+        {/* Keyed so each section fades in once when it is opened. */}
+        <div key={section} className="animate-fade-in">
+          <SectionContent />
+        </div>
       </main>
 
       <HandoffConfirm />
       <StaffPackageDrawer />
+      <StaffCommandMenu />
     </div>
   );
 }

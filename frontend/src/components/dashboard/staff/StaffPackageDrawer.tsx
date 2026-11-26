@@ -1,18 +1,27 @@
 /**
  * StaffPackageDrawer — slide-over detail panel for a single package.
- * Includes status badge, carrier/tracking info, resident info, storage
- * location, an inline edit form, audit history and a status-advance button.
  */
+import { useMemo } from "react";
 import {
-  Button, Card, Drawer, StatusBadge, TextInput, formatArrived,
+  Button, Drawer, StatusBadge, TextInput, formatArrived,
 } from "@/components/common";
-import { useStaff } from "./StaffContext";
-import { NEXT_STATUS } from "./StaffContext";
+import { cn } from "@/lib/utils";
+import { describeAudit, type AuditTone } from "./audit";
+import { formatDateTime } from "./format";
+import { NEXT_STATUS, useStaff } from "./StaffContext";
+import { ErrorNote, LoadingRows, Mono } from "./ui";
+
+const toneClass: Record<AuditTone, string> = {
+  default: "text-foreground",
+  success: "text-success-foreground",
+  alert: "text-primary",
+};
 
 export function StaffPackageDrawer() {
   const {
     drawerPkg, setDrawerPkg,
-    audit, auditError,
+    audit, auditLoading, auditError, reloadAudit,
+    appointments,
     editMode, setEditMode,
     editCarrier, setEditCarrier,
     editTracking, setEditTracking,
@@ -21,79 +30,60 @@ export function StaffPackageDrawer() {
     editSaving, editError, setEditError,
     editSuccess,
     handleEditSave, handleStatusAdvance,
+    statusBusyId, statusError,
   } = useStaff();
 
+  const timeline = useMemo(
+    () => (drawerPkg ? describeAudit(audit, appointments) : []),
+    [audit, appointments, drawerPkg],
+  );
+
+  const busy = drawerPkg ? statusBusyId === drawerPkg.id : false;
+
   return (
-    <Drawer open={!!drawerPkg} onClose={() => setDrawerPkg(null)} title="Package Detail">
+    <Drawer open={!!drawerPkg} onClose={() => setDrawerPkg(null)} title="Package detail">
       {drawerPkg && (
         <div className="space-y-6">
-          {/* Status badge */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <StatusBadge status={drawerPkg.status} />
-            <span className="font-mono text-xs text-muted-foreground">
-              ID #{drawerPkg.id}
-            </span>
+            <Mono className="text-muted-foreground">#{drawerPkg.id}</Mono>
           </div>
 
-          {/* Carrier & tracking */}
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Carrier
-            </p>
-            <p className="mt-1 text-sm font-medium">{drawerPkg.carrier_name}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Tracking Code
-            </p>
-            <p className="mt-1 font-mono text-sm">{drawerPkg.tracking_code}</p>
-          </div>
-
-          {/* Description */}
-          {drawerPkg.description && (
+          <dl className="grid gap-4 text-sm">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Description
-              </p>
-              <p className="mt-1 text-sm">{drawerPkg.description}</p>
+              <dt className="text-xs font-medium text-muted-foreground">Carrier</dt>
+              <dd className="mt-1 font-medium">{drawerPkg.carrier_name}</dd>
             </div>
-          )}
-
-          {/* Resident info */}
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Resident
-            </p>
-            <p className="mt-1 text-sm font-medium">{drawerPkg.resident_name}</p>
-            {drawerPkg.resident_unit && (
-              <p className="text-sm text-muted-foreground">
-                Unit {drawerPkg.resident_unit}
-              </p>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground">Tracking code</dt>
+              <dd className="mt-1"><Mono>{drawerPkg.tracking_code}</Mono></dd>
+            </div>
+            {drawerPkg.description && (
+              <div>
+                <dt className="text-xs font-medium text-muted-foreground">Description</dt>
+                <dd className="mt-1">{drawerPkg.description}</dd>
+              </div>
             )}
-          </div>
+            <div className="rounded-md border border-border bg-muted/40 px-3.5 py-3">
+              <dt className="text-xs font-medium text-muted-foreground">Resident</dt>
+              <dd className="mt-1 font-medium">{drawerPkg.resident_name}</dd>
+              {drawerPkg.resident_unit && (
+                <dd className="text-muted-foreground">Unit {drawerPkg.resident_unit}</dd>
+              )}
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground">Storage location</dt>
+              <dd className="mt-1">{drawerPkg.location_code ? <Mono>{drawerPkg.location_code}</Mono> : "Not assigned"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground">Arrived</dt>
+              <dd className="mt-1">{formatArrived(drawerPkg.arrived_at)}</dd>
+            </div>
+          </dl>
 
-          {/* Storage location */}
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Storage Location
-            </p>
-            <p className="mt-1 text-sm">
-              {drawerPkg.location_code || "Not assigned"}
-            </p>
-          </div>
-
-          {/* Arrival date */}
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Arrived
-            </p>
-            <p className="mt-1 text-sm">{formatArrived(drawerPkg.arrived_at)}</p>
-          </div>
-
-          {/* Edit form */}
           <div className="border-t border-border pt-5">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold">Package Details</h3>
+              <h3 className="text-sm font-semibold">Edit details</h3>
               {!editMode && (
                 <Button
                   variant="secondary"
@@ -107,13 +97,13 @@ export function StaffPackageDrawer() {
                     setEditMode(true);
                   }}
                 >
-                  Edit Package
+                  Edit package
                 </Button>
               )}
             </div>
 
             {editSuccess && (
-              <p className="mt-3 text-sm text-success">{editSuccess}</p>
+              <p role="status" className="mt-3 text-sm text-success">{editSuccess}</p>
             )}
 
             {editMode && (
@@ -125,7 +115,7 @@ export function StaffPackageDrawer() {
                   required
                 />
                 <TextInput
-                  label="Tracking Code"
+                  label="Tracking code"
                   value={editTracking}
                   onChange={(e) => setEditTracking(e.target.value)}
                   required
@@ -136,19 +126,19 @@ export function StaffPackageDrawer() {
                   onChange={(e) => setEditDescription(e.target.value)}
                 />
                 <TextInput
-                  label="Storage Location"
+                  label="Storage location"
                   value={editLocation}
                   onChange={(e) => setEditLocation(e.target.value)}
                   required
                 />
 
                 {editError && (
-                  <p className="text-sm text-destructive">{editError}</p>
+                  <p role="alert" className="text-sm text-primary">{editError}</p>
                 )}
 
                 <div className="flex flex-wrap gap-2">
-                  <Button type="submit" disabled={editSaving}>
-                    {editSaving ? "Saving…" : "Save Changes"}
+                  <Button type="submit" disabled={editSaving} aria-busy={editSaving}>
+                    {editSaving ? "Saving…" : "Save changes"}
                   </Button>
                   <Button
                     type="button"
@@ -166,57 +156,50 @@ export function StaffPackageDrawer() {
             )}
           </div>
 
-          {/* Audit history */}
-          <div className="border-t border-border pt-5">
-            <h3 className="mb-3 text-sm font-semibold">Audit History</h3>
-            {auditError && (
-              <p className="text-sm text-destructive">{auditError}</p>
-            )}
-            {!auditError && audit.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                No changes recorded yet.
-              </p>
-            )}
-            <div className="space-y-3">
-              {audit.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="rounded-lg border border-border bg-card p-3"
-                >
-                  <p className="text-sm font-medium">
-                    {entry.action.replaceAll("_", " ")}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {entry.changed_by_name || `Staff #${entry.changed_by}`}
-                    {" · "}
-                    {new Date(entry.changed_at).toLocaleString()}
-                  </p>
-                  {entry.new_values && (
-                    <div className="mt-2 space-y-1">
-                      {Object.entries(entry.new_values).map(([field, value]) => (
-                        <p key={field} className="break-words text-xs">
-                          <span className="font-medium">
-                            {field.replaceAll("_", " ")}:
-                          </span>{" "}
-                          {String(value ?? "Not set")}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+          {statusError && (
+            <ErrorNote>{statusError}</ErrorNote>
+          )}
 
-          {/* Status advance */}
           {NEXT_STATUS[drawerPkg.status] && (
             <Button
               className="w-full"
               onClick={() => handleStatusAdvance(drawerPkg)}
+              disabled={busy}
+              aria-busy={busy}
             >
-              {NEXT_STATUS[drawerPkg.status]!.label}
+              {busy ? "Updating…" : NEXT_STATUS[drawerPkg.status]!.label}
             </Button>
           )}
+
+          <div className="border-t border-border pt-5">
+            <h3 className="mb-3 text-sm font-semibold">Audit history</h3>
+            {auditError && (
+              <ErrorNote onRetry={reloadAudit}>Could not load history: {auditError}</ErrorNote>
+            )}
+            {auditLoading && !auditError && (
+              <LoadingRows rows={3} label="Loading audit history" />
+            )}
+            {!auditLoading && !auditError && timeline.length === 0 && (
+              <p className="text-sm text-muted-foreground">No changes recorded yet.</p>
+            )}
+            {!auditError && timeline.length > 0 && (
+              <ol className="space-y-0 divide-y divide-border rounded-md border border-border">
+                {timeline.map((line) => (
+                  <li key={line.id} className="px-3.5 py-3">
+                    <p className={cn("text-sm font-medium", toneClass[line.tone])}>{line.title}</p>
+                    {line.detail && (
+                      <p className="mt-0.5 text-[13px] text-muted-foreground">{line.detail}</p>
+                    )}
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      {line.who}
+                      <span aria-hidden="true"> · </span>
+                      <Mono>{formatDateTime(line.at)}</Mono>
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
         </div>
       )}
     </Drawer>
