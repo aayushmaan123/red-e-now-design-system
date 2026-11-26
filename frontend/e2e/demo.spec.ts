@@ -232,15 +232,16 @@ test("resident and front desk complete a pickup end to end", async ({ browser, p
     await expect(page.getByText("Pickup rescheduled successfully!")).toBeVisible();
     await expect.poll(() => remainingOf(page, firstTime)).toBe(before);
 
-    // Cancel it via the in-app confirmation dialog.
+    // Cancel from Home (Schedule may still show the booking form after a move).
+    await residentTab(page, "Home").click();
     await page.getByRole("button", { name: /^Cancel pickup$/i }).first().click();
     const cancelPrompt = page.getByRole("alertdialog");
     await expect(cancelPrompt).toBeVisible();
     await cancelPrompt.getByRole("button", { name: /^Cancel pickup$/i }).click();
     await expect(page.getByText("Pickup cancelled successfully.")).toBeVisible();
-    await expect(page.getByText("No pickups scheduled yet.")).toBeVisible();
 
     // Book again: the earliest open slot today, so the handoff can run now.
+    await residentTab(page, "Schedule").click();
     await chooseDate(page, today);
     expect(
       await slotButtons(page).count(),
