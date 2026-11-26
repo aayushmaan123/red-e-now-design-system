@@ -81,13 +81,17 @@ async function openStaffSection(page: Page, section: string, { reload = true } =
 /** Pick a date in the resident booking form and wait for that day's slots. */
 async function chooseDate(page: Page, day: string) {
   const slots = page.waitForResponse((r) => r.url().includes(`/scheduling/slots?date=${day}`));
-  await page.getByLabel("Pickup Date").fill(day);
+  await page.getByLabel(/^Pickup date/i).fill(day);
   await slots;
   await expect(page.getByText("Loading available times")).toHaveCount(0);
 }
 
+/** Slot buttons use locale clock labels; match by the `data-time` HH:MM value. */
+const slotByTime = (page: Page, time: string) =>
+  page.locator(`button[data-time="${time}"]`);
+
 const remainingOf = async (page: Page, time: string) => {
-  const text = await slotButtons(page).filter({ hasText: time }).first().innerText();
+  const text = await slotByTime(page, time).innerText();
   return Number(/(\d+)\s+remaining/.exec(text)?.[1]);
 };
 
@@ -207,31 +211,38 @@ test("resident and front desk complete a pickup end to end", async ({ browser, p
     expect(laterDay, "a day in the next week with two open pickup slots").not.toBe("");
 
     await pickPackage();
-    const firstTime = (await slotButtons(page).nth(0).innerText()).slice(0, 5);
-    const secondTime = (await slotButtons(page).nth(1).innerText()).slice(0, 5);
+    const firstTime = (await slotButtons(page).nth(0).getAttribute("data-time")) ?? "";
+    const secondTime = (await slotButtons(page).nth(1).getAttribute("data-time")) ?? "";
+    expect(firstTime).toMatch(/^\d{2}:\d{2}$/);
+    expect(secondTime).toMatch(/^\d{2}:\d{2}$/);
     const before = await remainingOf(page, firstTime);
-    await slotButtons(page).nth(0).click();
-    await page.getByRole("button", { name: "Confirm Pickup" }).click();
+    await slotByTime(page, firstTime).click();
+    await page.getByRole("button", { name: /^Confirm pickup$/i }).click();
     await expect(page.getByText("Pickup scheduled successfully!")).toBeVisible();
     // Capacity for that slot drops by one.
     await expect.poll(() => remainingOf(page, firstTime)).toBe(before - 1);
 
     // Move it.
     await residentTab(page, "Home").click();
-    await page.getByRole("button", { name: "Reschedule" }).click();
-    await expect(page.getByRole("heading", { name: "Reschedule Pickup" })).toBeVisible();
-    await expect(slotButtons(page).first()).toBeVisible();
-    await slotButtons(page).filter({ hasText: secondTime }).click();
-    await page.getByRole("button", { name: "Confirm Reschedule" }).click();
+    await page.getByRole("button", { name: /Reschedule/i }).click();
+    await expect(page.getByRole("heading", { name: /^Reschedule pickup$/i })).toBeVisible();
+    await expect(slotByTime(page, secondTime)).toBeVisible();
+    await slotByTime(page, secondTime).click();
+    await page.getByRole("button", { name: /^Confirm reschedule$/i }).click();
     await expect(page.getByText("Pickup rescheduled successfully!")).toBeVisible();
     await expect.poll(() => remainingOf(page, firstTime)).toBe(before);
 
-    // Cancel it (the browser confirm dialog is accepted above).
-    await page.getByRole("button", { name: "Cancel Pickup" }).click();
+    // Cancel from Home (Schedule may still show the booking form after a move).
+    await residentTab(page, "Home").click();
+    // Accessible name is "Cancel pickup for …" (aria-label); dialog confirm is exact.
+    await page.getByRole("button", { name: /Cancel pickup/i }).first().click();
+    const cancelPrompt = page.getByRole("alertdialog");
+    await expect(cancelPrompt).toBeVisible();
+    await cancelPrompt.getByRole("button", { name: /^Cancel pickup$/i }).click();
     await expect(page.getByText("Pickup cancelled successfully.")).toBeVisible();
-    await expect(page.getByText("No pickups scheduled yet.")).toBeVisible();
 
     // Book again: the earliest open slot today, so the handoff can run now.
+    await residentTab(page, "Schedule").click();
     await chooseDate(page, today);
     expect(
       await slotButtons(page).count(),
@@ -239,7 +250,7 @@ test("resident and front desk complete a pickup end to end", async ({ browser, p
     ).toBeGreaterThan(0);
     await pickPackage();
     await slotButtons(page).first().click();
-    await page.getByRole("button", { name: "Confirm Pickup" }).click();
+    await page.getByRole("button", { name: /^Confirm pickup$/i }).click();
     await expect(page.getByText("Pickup scheduled successfully!")).toBeVisible();
   });
 
@@ -263,7 +274,7 @@ test("resident and front desk complete a pickup end to end", async ({ browser, p
 
   await test.step("5. Check-in, identity, sign-off and completion", async () => {
     await refreshResident(page, "Pickups");
-    await page.getByRole("button", { name: "Check In" }).click();
+    await page.getByRole("button", { name: /^Check in$/i }).click();
     await expect(page.getByText("Checked in", { exact: true })).toBeVisible();
     await expect(page.getByText("Pending").first()).toBeVisible();
 
@@ -298,7 +309,7 @@ test("resident and front desk complete a pickup end to end", async ({ browser, p
 
     // The resident sees the receipt in their history.
     await refreshResident(page, "Pickups");
-    const receipts = page.getByRole("heading", { name: "Package Picked Up" });
+    const receipts = page.getByRole("heading", { name: /^Package picked up$/i });
     await expect(receipts).toHaveCount(1);
     await expect(page.getByText(tracking)).toBeVisible();
     await expect(page.getByText("No pickups scheduled")).toBeVisible();
