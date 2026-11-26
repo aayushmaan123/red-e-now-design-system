@@ -1,20 +1,24 @@
 /**
- * Auth screen components for Red-E Now.
+ * Auth screens for Red-E Now.
  *
- * Contains LoginScreen (resident + staff), SignUpScreen (resident only),
- * and RecoveryScreen (password reset).
- * All screens share the AuthFrame layout wrapper.
+ * LoginScreen (resident + staff), SignUpScreen (resident only) and RecoveryScreen (password help).
+ * All share the AuthFrame layout: the form on the left, and from the lg breakpoint a quiet panel
+ * on the right showing the labelled example of the front-desk board.
  *
- * Business logic and API calls are UNCHANGED.
+ * Auth is real: LoginScreen calls signIn (POST /api/auth/login), SignUpScreen calls signUp
+ * (POST /api/auth/register). Labels and button names are located by the end-to-end test
+ * (e2e/demo.spec.ts); change them there in the same commit if they ever change here.
  */
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, CircleAlert } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button, LoadingSpinner, TextInput, ThemeTabs, Wordmark, labelClass } from "@/components/common";
+import { focusRing, quietLink, textLink } from "@/components/landing/ButtonLink";
 import { PickupBoardPreview } from "@/components/landing/PickupBoardPreview";
 import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 
 type Role = "resident" | "staff";
 
@@ -24,89 +28,122 @@ type Role = "resident" | "staff";
  */
 const SHOW_DEMO_HINTS = import.meta.env.DEV || import.meta.env["VITE_DEMO_HINTS"] === "true";
 
-/** Inline text link used across auth screens: foreground text, underline turns red on hover. */
-const textLink = "font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-sm";
+const DEMO_PASSWORD = "password123";
+const DEMO_EMAIL: Record<Role, string> = { resident: "jane@redenow.com", staff: "staff@redenow.com" };
+const DEMO_BUILDING_CODE = "REDENOW";
 
-/** Error banner for auth forms (red tint, matches DESIGN.md status treatment). */
+/**
+ * Error banner for auth forms. The message is foreground text on the red tint (the red itself
+ * is below 4.5:1 as small text in the dark theme); the icon and border carry the colour.
+ */
 function FormError({ message }: { message: string }) {
-  return <AnimatePresence>
-    {message && (
-      <motion.p
-        initial={{ opacity: 0, height: 0 }}
-        animate={{ opacity: 1, height: "auto" }}
-        exit={{ opacity: 0, height: 0 }}
-        role="alert"
-        className="tint-primary rounded-md px-3.5 py-2.5 text-sm text-primary"
-      >
-        {message}
-      </motion.p>
-    )}
-  </AnimatePresence>;
+  return (
+    <AnimatePresence initial={false}>
+      {message && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.2 }}
+          className="overflow-hidden"
+        >
+          <p role="alert" className="tint-primary flex items-start gap-2.5 rounded-md border border-primary/40 px-3.5 py-2.5 text-sm leading-snug text-foreground">
+            <CircleAlert size={16} aria-hidden="true" className="mt-px shrink-0 text-primary" />
+            <span>{message}</span>
+          </p>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/** Resident / Front desk switch on the sign-in screens: two links styled as one segmented control. */
+function PortalSwitch({ role }: { role: Role }) {
+  const item = (active: boolean) => cn(
+    "inline-flex h-7 items-center rounded-[5px] px-3 text-[13px] font-medium transition-colors",
+    focusRing,
+    active
+      ? "bg-card text-foreground shadow-[0_0_0_1px_var(--border-strong),0_1px_2px_var(--shadow-tone)]"
+      : "text-muted-foreground hover:text-foreground",
+  );
+  return (
+    <nav aria-label="Sign-in type" className="inline-flex items-center gap-0.5 rounded-md border border-border bg-muted p-0.5">
+      <Link to="/login" aria-current={role === "resident" ? "page" : undefined} className={item(role === "resident")}>Resident</Link>
+      <Link to="/staff/login" aria-current={role === "staff" ? "page" : undefined} className={item(role === "staff")}>Front desk</Link>
+    </nav>
+  );
+}
+
+/** Demo-only hint box: shows a seed value in mono and fills the form with it. */
+function DemoHint({ label, lines, onFill }: { label: string; lines: string[]; onFill: () => void }) {
+  return (
+    <div className="mt-6 flex items-center justify-between gap-4 rounded-md border border-border bg-card px-3.5 py-3">
+      <div className="min-w-0">
+        <p className={labelClass}>{label}</p>
+        <p className="mt-1 break-all font-mono text-[12px] leading-relaxed text-foreground/90">
+          {lines.map((line) => <span key={line} className="block">{line}</span>)}
+        </p>
+      </div>
+      <Button type="button" variant="secondary" size="sm" onClick={onFill}>Fill in</Button>
+    </div>
+  );
 }
 
 /**
- * Shared layout wrapper for all auth screens — form column on the left; on large screens a hero panel
- * on the right with the live example pickup board (the only place besides the landing hero that uses
- * rim light / streaks / dots, per DESIGN.md).
+ * Shared layout for every auth screen: form column, and from lg a side panel with the
+ * example front-desk board (static sample data, labelled "Example").
  */
 function AuthFrame({
   role = "resident",
+  eyebrow,
   title,
   subtitle,
   children,
   footer,
 }: {
   role?: Role;
+  eyebrow: ReactNode;
   title: string;
   subtitle: string;
   children: ReactNode;
   footer?: ReactNode;
 }) {
   return (
-    <main className="grid min-h-screen bg-background lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-      {/* Form column */}
-      <div className="flex min-h-screen flex-col px-6 py-6 sm:px-10">
-        <header className="flex items-center justify-between gap-4">
+    <div className="grid min-h-dvh bg-background text-foreground lg:grid-cols-2">
+      <div className="flex min-h-dvh flex-col px-5 sm:px-10">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-4">
           <Wordmark />
-          <div className="flex items-center gap-3">
-            <ThemeTabs compact />
-            <Link to={role === "staff" ? "/login" : "/staff/login"} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-              {role === "staff" ? "Resident sign in" : "Staff portal"}
-            </Link>
-          </div>
+          <ThemeTabs compact />
         </header>
 
-        <div className="mx-auto my-auto w-full max-w-[400px] py-12">
-          <p className={labelClass}>{role === "staff" ? "Front desk" : "Residents"}</p>
-          <h1 className="mt-3 font-display text-[40px] font-medium leading-[0.95] tracking-[-0.022em] text-foreground">
-            {title}
-          </h1>
-          <p className="mt-3 text-[15px] text-muted-foreground">{subtitle}</p>
+        <main className="animate-in fade-in fill-mode-both mx-auto my-auto w-full max-w-[380px] py-8 duration-500 sm:py-12">
+          {eyebrow}
+          <h1 className="mt-5 text-[30px] font-medium leading-[1.08] tracking-[-0.022em] text-foreground sm:text-[34px]">{title}</h1>
+          <p className="mt-2.5 text-[15px] leading-relaxed text-muted-foreground">{subtitle}</p>
 
           <div className="mt-8">{children}</div>
 
           {footer && <div className="mt-8 border-t border-border pt-6 text-sm text-muted-foreground">{footer}</div>}
-        </div>
+        </main>
 
-        <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">© {new Date().getFullYear()} Red-E Now</p>
+        <footer className="flex h-14 shrink-0 items-center text-[13px] text-muted-foreground">
+          © {new Date().getFullYear()} Red-E Now
+        </footer>
       </div>
 
-      {/* Hero panel (lg+) */}
-      <aside className="relative isolate hidden flex-col justify-center overflow-hidden border-l border-border px-12 py-16 lg:flex xl:px-20">
-        <div aria-hidden="true" className="dot-field" />
-        <div aria-hidden="true" className="hero-streaks"><i /><i /><i /><i /></div>
-        <p className={labelClass}>{role === "staff" ? "Today at the desk" : "Ready when you are"}</p>
-        <p className="mt-3 max-w-[18ch] font-display text-3xl font-medium leading-none tracking-[-0.01em]">
-          {role === "staff" ? "Every pickup, one board." : "Your packages, pulled before you arrive."}
+      <aside className="sticky top-0 hidden h-dvh flex-col justify-center-safe overflow-hidden border-l border-border bg-muted/40 px-12 py-16 lg:flex xl:px-16">
+        <p className={labelClass}>{role === "staff" ? "The desk console" : "What the front desk sees"}</p>
+        <p className="mt-4 max-w-[19ch] text-[32px] font-medium leading-[1.08] tracking-[-0.022em] text-foreground">
+          {role === "staff" ? "Every pickup for the day, in time order." : "Your booking goes straight to the desk's board."}
         </p>
-        <PickupBoardPreview className="mt-10 w-full max-w-[560px]" />
+        <PickupBoardPreview fade className="mt-12 w-full shrink-0" />
       </aside>
-    </main>
+    </div>
   );
 }
 
 /**
- * Login form for both resident and staff roles.
+ * Sign-in form for residents and staff.
  * Uses real auth (AuthContext signIn) — calls POST /api/auth/login.
  */
 export function LoginScreen({ role }: { role: Role }) {
@@ -134,58 +171,45 @@ export function LoginScreen({ role }: { role: Role }) {
   return (
     <AuthFrame
       role={role}
-      title={role === "staff" ? "Staff sign in" : "Welcome home"}
-      subtitle={
-        role === "staff"
-          ? "Sign in to the desk console."
-          : "Sign in to see your packages and book a pickup."
-      }
+      eyebrow={<PortalSwitch role={role} />}
+      title={role === "staff" ? "Front desk sign in" : "Sign in to Red-E Now"}
+      subtitle={role === "staff" ? "Open the desk console for your building." : "See your packages and book a pickup."}
       footer={
         role === "resident" ? (
           <>
             New to your building?{" "}
-            <Link to="/signup" className={textLink}>
-              Create an account
-            </Link>
+            <Link to="/signup" className={textLink}>Create an account</Link>
           </>
         ) : (
-          <>
-            Not on staff?{" "}
-            <Link to="/login" className={textLink}>
-              Resident sign in
-            </Link>
-          </>
+          <>Staff accounts are set up by your building administrator.</>
         )
       }
     >
       <form onSubmit={submit} className="space-y-5">
-        <div>
-          <TextInput
-            label="Email address"
-            type="email"
-            autoComplete="email"
-            required
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
+        <TextInput
+          label="Email address"
+          name="email"
+          type="email"
+          autoComplete="email"
+          required
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
 
         <div>
           <TextInput
             label="Password"
+            name="password"
             type="password"
             autoComplete="current-password"
             required
-            placeholder="Enter your password"
+            placeholder="Your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <div className="mt-2 text-right">
-            <Link
-              to={role === "staff" ? "/staff/forgot-password" : "/forgot-password"}
-              className="rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
+          <div className="mt-2.5 text-right">
+            <Link to={role === "staff" ? "/staff/forgot-password" : "/forgot-password"} className={cn(quietLink, "text-sm")}>
               Forgot password?
             </Link>
           </div>
@@ -193,26 +217,19 @@ export function LoginScreen({ role }: { role: Role }) {
 
         <FormError message={error} />
 
-        <div>
-          <Button type="submit" fullWidth size="lg" disabled={loading}>
-            {loading ? (
-              <LoadingSpinner className="text-primary-foreground" />
-            ) : (
-              <>
-                Sign in <ArrowRight size={17} />
-              </>
-            )}
-          </Button>
-        </div>
+        <Button type="submit" fullWidth disabled={loading} aria-busy={loading} className="h-11">
+          {loading ? <><LoadingSpinner className="size-4 text-current" /> Signing in…</> : "Sign in"}
+        </Button>
       </form>
 
       {/* Demo credentials — local dev, or a hosted demo built with VITE_DEMO_HINTS=true */}
-      {SHOW_DEMO_HINTS && <div className="mt-6 rounded-md border border-border bg-card px-3.5 py-3">
-        <p className={labelClass}>Demo accounts</p>
-        <p className="mt-1.5 font-mono text-[12px] leading-relaxed text-muted-foreground">
-          {role === "staff" ? "staff@redenow.com" : "jane@redenow.com"}<br />password123
-        </p>
-      </div>}
+      {SHOW_DEMO_HINTS && (
+        <DemoHint
+          label="Demo account"
+          lines={[DEMO_EMAIL[role], DEMO_PASSWORD]}
+          onFill={() => { setEmail(DEMO_EMAIL[role]); setPassword(DEMO_PASSWORD); }}
+        />
+      )}
     </AuthFrame>
   );
 }
@@ -267,46 +284,44 @@ export function SignUpScreen() {
 
   return (
     <AuthFrame
-      title="Create account"
-      subtitle="Use the building code from your welcome letter or the front desk."
+      eyebrow={<p className={labelClass}>For residents</p>}
+      title="Create your account"
+      subtitle="You need the building code from your welcome letter or the front desk."
       footer={
         <>
           Already have an account?{" "}
-          <Link to="/login" className={textLink}>
-            Sign in
-          </Link>
+          <Link to="/login" className={textLink}>Sign in</Link>
         </>
       }
     >
       <form onSubmit={submit} className="space-y-4">
-        <TextInput label="Full name" autoComplete="name" required placeholder="Your full name" value={values.name} onChange={set("name")} />
-        <TextInput label="Email address" type="email" autoComplete="email" required placeholder="you@example.com" value={values.email} onChange={set("email")} />
+        <TextInput label="Full name" name="name" autoComplete="name" required placeholder="Your full name" value={values.name} onChange={set("name")} />
+        <TextInput label="Email address" name="email" type="email" autoComplete="email" required placeholder="you@example.com" value={values.email} onChange={set("email")} />
 
         <div className="grid grid-cols-2 gap-4">
-          <TextInput label="Unit number" required maxLength={20} placeholder="e.g. 4B" value={values.unit} onChange={set("unit")} />
-          <TextInput label="Building code" required maxLength={20} autoCapitalize="characters" placeholder="From the front desk" value={values.building} onChange={set("building")} />
+          <TextInput label="Unit number" name="unit" required maxLength={20} placeholder="e.g. 4B" value={values.unit} onChange={set("unit")} />
+          <TextInput label="Building code" name="building-code" required maxLength={20} autoCapitalize="characters" autoComplete="off" spellCheck={false} className="font-mono" value={values.building} onChange={set("building")} />
         </div>
-        <TextInput label="Password" type="password" autoComplete="new-password" required placeholder="At least 8 characters" value={values.password} onChange={set("password")} />
-        <TextInput label="Confirm password" type="password" autoComplete="new-password" required placeholder="Repeat password" value={values.confirm} onChange={set("confirm")} />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextInput label="Password" name="password" type="password" autoComplete="new-password" required helperText="At least 8 characters." value={values.password} onChange={set("password")} />
+          <TextInput label="Confirm password" name="confirm-password" type="password" autoComplete="new-password" required value={values.confirm} onChange={set("confirm")} />
+        </div>
 
         <FormError message={error} />
 
-        <Button type="submit" size="lg" fullWidth disabled={loading}>
-          {loading ? (
-            <LoadingSpinner className="text-primary-foreground" />
-          ) : (
-            <>
-              Create account <ArrowRight size={17} />
-            </>
-          )}
+        <Button type="submit" fullWidth disabled={loading} aria-busy={loading} className="h-11">
+          {loading ? <><LoadingSpinner className="size-4 text-current" /> Creating account…</> : "Create account"}
         </Button>
       </form>
 
       {/* Demo building code — same visibility rule as the demo accounts on the sign-in screen */}
-      {SHOW_DEMO_HINTS && <div className="mt-6 rounded-md border border-border bg-card px-3.5 py-3">
-        <p className={labelClass}>Demo building code</p>
-        <p className="mt-1.5 font-mono text-[12px] leading-relaxed text-muted-foreground">REDENOW</p>
-      </div>}
+      {SHOW_DEMO_HINTS && (
+        <DemoHint
+          label="Demo building code"
+          lines={[DEMO_BUILDING_CODE]}
+          onFill={() => setValues((v) => ({ ...v, building: DEMO_BUILDING_CODE }))}
+        />
+      )}
     </AuthFrame>
   );
 }
@@ -317,33 +332,47 @@ export function SignUpScreen() {
  * it from the Residents page); staff go through their administrator.
  */
 export function RecoveryScreen({ role }: { role: Role }) {
+  const residentSteps = [
+    "Go to the front desk and ask for a password reset.",
+    "Once they confirm who you are, they give you a temporary password. Your old password stops working straight away.",
+    "Sign in with your email address and the temporary password.",
+  ];
+
   return (
     <AuthFrame
       role={role}
-      title="Reset password"
+      eyebrow={<p className={labelClass}>{role === "staff" ? "Front desk" : "For residents"}</p>}
+      title="Password help"
       subtitle={
         role === "staff"
           ? "Staff passwords are reset by your building administrator."
-          : "The front desk can reset your password in person."
+          : "Red-E Now does not send reset links by email. The front desk resets your password in person."
       }
       footer={
         <Link
           to={role === "staff" ? "/staff/login" : "/login"}
-          className="inline-flex items-center gap-2 rounded-sm font-semibold text-foreground transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className={cn(focusRing, "inline-flex items-center gap-2 rounded-sm font-medium text-foreground transition-colors hover:text-muted-foreground")}
         >
-          <ArrowLeft size={15} /> Back to sign in
+          <ArrowLeft size={15} aria-hidden="true" /> Back to sign in
         </Link>
       }
     >
-      <div className="rounded-md border border-border bg-card p-5">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.015em] text-foreground">
-          What to do
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          {role === "staff"
-            ? "Contact the administrator who set up your desk account and ask them to issue a new password."
-            : "Stop by the front desk and ask for a password reset. Once they confirm who you are, they will give you a temporary password to sign in with. Reset links are not sent by email."}
-        </p>
+      <div className="rounded-lg border border-border bg-card p-5">
+        <h2 className="text-[15px] font-medium tracking-[-0.01em] text-foreground">What to do</h2>
+        {role === "staff" ? (
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            Contact the administrator who set up your desk account and ask them to issue a new password.
+          </p>
+        ) : (
+          <ol className="mt-4 space-y-4">
+            {residentSteps.map((step, i) => (
+              <li key={step} className="flex gap-3.5 text-sm leading-relaxed text-muted-foreground">
+                <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-full border border-border-strong font-mono text-[12px] text-foreground">{i + 1}</span>
+                <span className="pt-0.5">{step}</span>
+              </li>
+            ))}
+          </ol>
+        )}
       </div>
     </AuthFrame>
   );
