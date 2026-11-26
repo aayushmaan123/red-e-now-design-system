@@ -109,8 +109,8 @@ function AuthFrame({
   footer?: ReactNode;
 }) {
   return (
-    <div className="grid min-h-dvh bg-background text-foreground lg:grid-cols-2">
-      <div className="flex min-h-dvh flex-col px-5 sm:px-10">
+    <div className="relative grid min-h-dvh text-foreground lg:grid-cols-2">
+      <div className="flex min-h-dvh flex-col bg-background/70 px-5 sm:px-10 backdrop-blur-sm">
         <header className="flex h-16 shrink-0 items-center justify-between gap-4">
           <Wordmark />
           <ThemeTabs compact />
@@ -131,7 +131,7 @@ function AuthFrame({
         </footer>
       </div>
 
-      <aside className="sticky top-0 hidden h-dvh flex-col justify-center-safe overflow-hidden border-l border-border bg-muted/40 px-12 py-16 lg:flex xl:px-16">
+      <aside className="sticky top-0 hidden h-dvh flex-col justify-center-safe overflow-hidden border-l border-border bg-muted/30 px-12 py-16 backdrop-blur-sm lg:flex xl:px-16">
         <p className={labelClass}>{role === "staff" ? "The desk console" : "What the front desk sees"}</p>
         <p className="mt-4 max-w-[19ch] text-[32px] font-medium leading-[1.08] tracking-[-0.022em] text-foreground">
           {role === "staff" ? "Every pickup for the day, in time order." : "Your booking goes straight to the desk's board."}

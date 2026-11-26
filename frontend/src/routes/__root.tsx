@@ -20,6 +20,7 @@ import { Toaster } from "sonner";
 import { MotionConfig } from "framer-motion";
 
 import appCss from "../styles.css?url";
+import { MetalBackdrop } from "@/components/common/MetalBackdrop";
 import { AuthProvider } from "@/context/AuthContext";
 import { themeInitScript } from "@/hooks/useTheme";
 
@@ -130,6 +131,7 @@ function RootComponent() {
   return (
     <MotionConfig reducedMotion="user">
     <QueryClientProvider client={queryClient}>
+      <MetalBackdrop />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <AuthProvider><Outlet /></AuthProvider>
       <Toaster

@@ -4,9 +4,11 @@
  * Desktop: a fixed 232px rail. Small screens: the same navigation inside a
  * dialog that slides in from the left (focus is trapped, Escape closes it).
  * The live counts next to the pickup sections come from the loaded appointments.
+ * Active item uses a shared layoutId so the red highlight slides between options.
  */
 import { useId, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { LayoutGroup, motion } from "framer-motion";
 import { LogOut, X } from "lucide-react";
 import { Avatar, Button, ThemeTabs } from "@/components/common";
 import { cn } from "@/lib/utils";
@@ -14,6 +16,23 @@ import { BuildingName, useStaff } from "./StaffContext";
 import { NAV_GROUPS, type SectionName } from "./StaffTypes";
 import { plural } from "./format";
 import { focusRing } from "./ui";
+
+const ACTIVE_PILL = {
+  type: "spring" as const,
+  stiffness: 420,
+  damping: 34,
+  mass: 0.55,
+};
+
+function ActivePill({ id }: { id: string }) {
+  return (
+    <motion.span
+      layoutId={id}
+      className="absolute inset-0 rounded-md bg-primary/15 ring-1 ring-inset ring-primary/30"
+      transition={ACTIVE_PILL}
+    />
+  );
+}
 
 /** What the number next to a section means, for screen readers. */
 function useSectionCounts(): Partial<Record<SectionName, { count: number; meaning: string; urgent?: boolean }>> {
@@ -35,7 +54,7 @@ function useSectionCounts(): Partial<Record<SectionName, { count: number; meanin
   };
 }
 
-function NavList({ roomy = false }: { roomy?: boolean }) {
+function NavList({ roomy = false, pillId }: { roomy?: boolean; pillId: string }) {
   const { section, choose } = useStaff();
   const counts = useSectionCounts();
   const idPrefix = useId();
@@ -45,7 +64,7 @@ function NavList({ roomy = false }: { roomy?: boolean }) {
       {NAV_GROUPS.map((group, g) => (
         <div key={group.heading} className={g > 0 ? "mt-5" : undefined}>
           <p className="mb-1 px-2.5 text-xs font-medium text-muted-foreground">{group.heading}</p>
-          <ul className="space-y-px">
+          <ul className="space-y-0.5">
             {group.items.map((item, i) => {
               const active = section === item.label;
               const info = counts[item.label];
@@ -59,23 +78,31 @@ function NavList({ roomy = false }: { roomy?: boolean }) {
                     aria-current={active ? "page" : undefined}
                     aria-describedby={showCount ? countId : undefined}
                     className={cn(
-                      "relative flex w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[13.5px] transition-colors",
+                      "relative flex w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[13.5px] transition-[color,background-color] duration-200",
                       roomy ? "h-10" : "h-8",
                       focusRing,
                       active
-                        ? "bg-sidebar-accent font-medium text-foreground before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-primary"
-                        : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+                        ? "font-medium text-primary"
+                        : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground",
                     )}
                   >
-                    <item.icon size={16} strokeWidth={1.8} aria-hidden="true" className="shrink-0" />
-                    {item.label}
+                    {active && <ActivePill id={pillId} />}
+                    <item.icon
+                      size={16}
+                      strokeWidth={active ? 2 : 1.8}
+                      aria-hidden="true"
+                      className="relative z-[1] shrink-0"
+                    />
+                    <span className="relative z-[1] truncate">{item.label}</span>
                     {showCount && (
                       <>
                         <span
                           aria-hidden="true"
                           className={cn(
-                            "ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-sm px-1 font-mono text-[11.5px] tabular-nums",
-                            info.urgent ? "tint-primary font-medium text-foreground" : "text-muted-foreground",
+                            "relative z-[1] ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-sm px-1 font-mono text-[11.5px] tabular-nums transition-colors",
+                            active || info.urgent
+                              ? "tint-primary font-medium text-primary"
+                              : "text-muted-foreground",
                           )}
                         >
                           {info.count}
@@ -104,8 +131,9 @@ function Brand({ children }: { children?: ReactNode }) {
   );
 }
 
-function Footer({ showTheme = false }: { showTheme?: boolean }) {
+function Footer({ showTheme = false, pillId }: { showTheme?: boolean; pillId: string }) {
   const { user, logout, choose, section } = useStaff();
+  const accountActive = section === "Account";
   return (
     <div className="shrink-0 space-y-2 border-t border-sidebar-border p-3">
       {showTheme && (
@@ -118,13 +146,22 @@ function Footer({ showTheme = false }: { showTheme?: boolean }) {
         type="button"
         onClick={() => choose("Account")}
         aria-label={`Account: ${user?.name || "Staff"}`}
-        aria-current={section === "Account" ? "page" : undefined}
-        className={cn("flex w-full items-center gap-2.5 rounded-md p-1.5 text-left transition-colors hover:bg-sidebar-accent", focusRing)}
+        aria-current={accountActive ? "page" : undefined}
+        className={cn(
+          "relative flex w-full items-center gap-2.5 rounded-md p-1.5 text-left transition-[color,background-color] duration-200",
+          focusRing,
+          accountActive ? "text-primary" : "hover:bg-sidebar-accent/70",
+        )}
       >
-        <Avatar name={user?.name || "Staff"} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13.5px] font-medium leading-tight">{user?.name || "Staff"}</span>
-          <span className="block truncate text-xs leading-tight text-muted-foreground"><BuildingName /></span>
+        {accountActive && <ActivePill id={pillId} />}
+        <span className="relative z-[1] flex min-w-0 flex-1 items-center gap-2.5">
+          <Avatar name={user?.name || "Staff"} />
+          <span className="min-w-0 flex-1">
+            <span className={cn("block truncate text-[13.5px] font-medium leading-tight", accountActive && "text-primary")}>
+              {user?.name || "Staff"}
+            </span>
+            <span className="block truncate text-xs leading-tight text-muted-foreground"><BuildingName /></span>
+          </span>
         </span>
       </button>
       <Button variant="ghost" size="sm" className="w-full justify-start gap-2.5 px-2.5 text-[13.5px] font-medium" onClick={logout}>
@@ -134,25 +171,46 @@ function Footer({ showTheme = false }: { showTheme?: boolean }) {
   );
 }
 
+function SidebarBody({ roomy = false, showTheme = false, pillId }: { roomy?: boolean; showTheme?: boolean; pillId: string }) {
+  return (
+    <LayoutGroup id={pillId}>
+      <NavList roomy={roomy} pillId={pillId} />
+      <Footer showTheme={showTheme} pillId={pillId} />
+    </LayoutGroup>
+  );
+}
+
 export function StaffSidebar() {
   const { menu, setMenu } = useStaff();
 
   return (
     <>
       {/* Desktop rail */}
-      <aside className="fixed inset-y-0 left-0 z-10 hidden w-[232px] flex-col border-r border-sidebar-border bg-sidebar lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-10 hidden w-[232px] flex-col border-r border-sidebar-border bg-sidebar/90 backdrop-blur-md lg:flex">
         <Brand><span className="pr-3 text-xs text-muted-foreground">Front desk</span></Brand>
-        <NavList />
-        <Footer />
+        <SidebarBody pillId="staff-nav-desktop" />
       </aside>
 
       {/* Small-screen menu */}
       <Dialog.Root open={menu} onOpenChange={setMenu}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-overlay animate-fade-in lg:hidden" />
+          <Dialog.Overlay
+            className={cn(
+              "fixed inset-0 z-40 bg-overlay lg:hidden",
+              "data-[state=open]:animate-in data-[state=closed]:animate-out",
+              "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
+              "data-[state=open]:duration-300 data-[state=closed]:duration-200",
+            )}
+          />
           <Dialog.Content
             aria-describedby={undefined}
-            className="fixed inset-y-0 left-0 z-50 flex w-[min(86vw,304px)] flex-col border-r border-border-strong bg-sidebar outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-left data-[state=open]:duration-200 lg:hidden"
+            className={cn(
+              "fixed inset-y-0 left-0 z-50 flex w-[min(86vw,304px)] flex-col border-r border-border-strong bg-sidebar outline-none lg:hidden",
+              "data-[state=open]:animate-in data-[state=closed]:animate-out",
+              "data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left",
+              "data-[state=open]:duration-300 data-[state=closed]:duration-200",
+              "ease-out",
+            )}
           >
             <Dialog.Title className="sr-only">Menu</Dialog.Title>
             <Brand>
@@ -162,8 +220,7 @@ export function StaffSidebar() {
                 </Button>
               </Dialog.Close>
             </Brand>
-            <NavList roomy />
-            <Footer showTheme />
+            <SidebarBody roomy showTheme pillId="staff-nav-mobile" />
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

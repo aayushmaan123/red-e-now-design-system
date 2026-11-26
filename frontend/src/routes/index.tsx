@@ -1,4 +1,5 @@
 /* Landing page: what Red-E Now does, for residents and for the front desk. */
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowRight, CalendarClock, CalendarDays, ClipboardCheck, ClipboardList, History, ListOrdered,
@@ -8,8 +9,9 @@ import { ThemeTabs, Wordmark, labelClass } from "@/components/common";
 import { ButtonLink, focusRing, quietLink } from "@/components/landing/ButtonLink";
 import { PickupBoardPreview } from "@/components/landing/PickupBoardPreview";
 import { Reveal, StackingSteps, type Step } from "@/components/landing/ScrollSections";
-import { FactList, FeatureGrid, SectionHeading, container, sectionTitle, type Fact, type Feature } from "@/components/landing/Sections";
+import { FeatureGrid, SectionHeading, container, sectionTitle, type Feature } from "@/components/landing/Sections";
 import { ArrivesVignette, HandoffVignette, SlotVignette } from "@/components/landing/StepVignettes";
+import { TextAnimate } from "@/components/ui/text-animate";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -70,13 +72,6 @@ const deskFeatures: Feature[] = [
   { icon: CalendarDays, title: "Pickup hours and capacity", body: "Set when the desk takes pickups and how many bookings fit in a slot." },
 ];
 
-const facts: Fact[] = [
-  { question: "How do I get an account?", answer: "Ask the front desk for your building code, then sign up with your name, email and unit number." },
-  { question: "Will I be notified when a package arrives?", answer: "No. Red-E Now does not send emails, texts or push notifications. Open it to see what is waiting for you." },
-  { question: "Is there an app to download?", answer: "No. It is a website, so it works in the browser on a phone or a desk computer." },
-  { question: "What if I forget my password?", answer: "There are no reset emails. The front desk can issue a temporary password once they have confirmed who you are." },
-];
-
 /* ── Page ── */
 
 const navLink = cn(quietLink, "px-3 py-2 text-sm");
@@ -97,7 +92,6 @@ function Nav() {
             <a href="#how" data-testid="nav-how-link" className={navLink}>How it works</a>
             <a href="#residents" className={navLink}>Residents</a>
             <a href="#front-desk" className={navLink}>Front desk</a>
-            <a href="#questions" className={navLink}>Questions</a>
           </div>
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
@@ -148,13 +142,47 @@ function Hero() {
   );
 }
 
+const STATEMENT_LEAD = "One schedule for the package room.";
+const STATEMENT_BODY =
+  "Every package is logged to a resident, every pickup has a time, and every handoff is checked and signed for.";
+
+/** Remount TextAnimate on an interval so blur-in-by-word plays in a loop. */
 function Statement() {
+  const [cycle, setCycle] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setCycle((n) => n + 1), 6500);
+    return () => window.clearInterval(id);
+  }, []);
+
   return (
     <section className={cn(container, "py-24 sm:py-32")}>
       <Reveal>
-        <p className={cn(sectionTitle, "max-w-[34ch] text-muted-foreground")}>
-          <span className="text-foreground">One schedule for the package room.</span>{" "}
-          Every package is logged to a resident, every pickup has a time, and every handoff is checked and signed for.
+        <p className={cn(sectionTitle, "max-w-[34ch]")}>
+          <TextAnimate
+            key={`lead-${cycle}`}
+            as="span"
+            by="word"
+            animation="blurInUp"
+            duration={0.4}
+            startOnView={false}
+            once={false}
+            className="text-foreground"
+          >
+            {STATEMENT_LEAD}
+          </TextAnimate>{" "}
+          <TextAnimate
+            key={`body-${cycle}`}
+            as="span"
+            by="word"
+            animation="blurInUp"
+            delay={0.35}
+            duration={0.45}
+            startOnView={false}
+            once={false}
+            className="text-muted-foreground"
+          >
+            {STATEMENT_BODY}
+          </TextAnimate>
         </p>
       </Reveal>
     </section>
@@ -191,17 +219,6 @@ function AudienceSection({ id, label, title, lead, cta, features }: {
           </Link>
         </SectionHeading>
         <FeatureGrid features={features} className="mt-12 sm:mt-16" />
-      </div>
-    </section>
-  );
-}
-
-function Questions() {
-  return (
-    <section id="questions" className="scroll-mt-16 border-t border-border py-24 sm:py-32">
-      <div className={container}>
-        <SectionHeading label="Good to know" title="Plain answers" />
-        <FactList facts={facts} className="mt-10 sm:mt-14" />
       </div>
     </section>
   );
@@ -257,7 +274,6 @@ function Footer() {
             <li><a href="#how" className={footerLink}>How it works</a></li>
             <li><a href="#residents" className={footerLink}>For residents</a></li>
             <li><a href="#front-desk" className={footerLink}>For the front desk</a></li>
-            <li><a href="#questions" className={footerLink}>Good to know</a></li>
           </ul>
         </nav>
       </div>
@@ -273,7 +289,7 @@ function Footer() {
 
 function LandingPage() {
   return (
-    <div className="bg-background text-foreground">
+    <div className="relative text-foreground">
       <Nav />
       <main id="main">
         <Hero />
@@ -295,7 +311,6 @@ function LandingPage() {
           cta={{ to: "/staff/login", label: "Staff sign in" }}
           features={deskFeatures}
         />
-        <Questions />
         <ClosingCall />
       </main>
       <Footer />

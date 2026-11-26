@@ -83,13 +83,16 @@ function HandoffConfirm() {
 function StaffLayout() {
   const { section } = useStaff();
   return (
-    <div className="min-h-screen bg-background lg:pl-[232px]">
+    <div className="relative min-h-screen bg-background/70 lg:pl-[232px]">
       <StaffSidebar />
       <StaffHeader />
 
       <main className="mx-auto w-full max-w-[1240px] px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pt-8">
-        {/* Keyed so each section fades in once when it is opened. */}
-        <div key={section} className="animate-fade-in">
+        {/* Keyed so each section eases in when the sidebar selection changes. */}
+        <div
+          key={section}
+          className="animate-in fade-in slide-in-from-bottom-1 fill-mode-both duration-300 ease-out"
+        >
           <SectionContent />
         </div>
       </main>

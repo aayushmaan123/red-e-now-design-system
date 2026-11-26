@@ -63,7 +63,7 @@ export function ResidentHome() {
     : "";
 
   return (
-    <div className="min-h-screen bg-background pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]">
+    <div className="relative min-h-screen bg-background/70 pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]">
       <header className="sticky top-0 z-20 border-b border-border bg-card">
         {/* Flex (not centered absolute controls) so the title and actions do not overlap at ~390px. */}
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
