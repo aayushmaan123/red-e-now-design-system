@@ -234,7 +234,8 @@ test("resident and front desk complete a pickup end to end", async ({ browser, p
 
     // Cancel from Home (Schedule may still show the booking form after a move).
     await residentTab(page, "Home").click();
-    await page.getByRole("button", { name: /^Cancel pickup$/i }).first().click();
+    // Accessible name is "Cancel pickup for …" (aria-label); dialog confirm is exact.
+    await page.getByRole("button", { name: /Cancel pickup/i }).first().click();
     const cancelPrompt = page.getByRole("alertdialog");
     await expect(cancelPrompt).toBeVisible();
     await cancelPrompt.getByRole("button", { name: /^Cancel pickup$/i }).click();
