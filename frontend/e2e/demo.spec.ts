@@ -86,8 +86,12 @@ async function chooseDate(page: Page, day: string) {
   await expect(page.getByText("Loading available times")).toHaveCount(0);
 }
 
+/** Slot buttons use locale clock labels; match by the `data-time` HH:MM value. */
+const slotByTime = (page: Page, time: string) =>
+  page.locator(`button[data-time="${time}"]`);
+
 const remainingOf = async (page: Page, time: string) => {
-  const text = await slotButtons(page).filter({ hasText: time }).first().innerText();
+  const text = await slotByTime(page, time).innerText();
   return Number(/(\d+)\s+remaining/.exec(text)?.[1]);
 };
 
@@ -207,10 +211,12 @@ test("resident and front desk complete a pickup end to end", async ({ browser, p
     expect(laterDay, "a day in the next week with two open pickup slots").not.toBe("");
 
     await pickPackage();
-    const firstTime = (await slotButtons(page).nth(0).innerText()).slice(0, 5);
-    const secondTime = (await slotButtons(page).nth(1).innerText()).slice(0, 5);
+    const firstTime = (await slotButtons(page).nth(0).getAttribute("data-time")) ?? "";
+    const secondTime = (await slotButtons(page).nth(1).getAttribute("data-time")) ?? "";
+    expect(firstTime).toMatch(/^\d{2}:\d{2}$/);
+    expect(secondTime).toMatch(/^\d{2}:\d{2}$/);
     const before = await remainingOf(page, firstTime);
-    await slotButtons(page).nth(0).click();
+    await slotByTime(page, firstTime).click();
     await page.getByRole("button", { name: /^Confirm pickup$/i }).click();
     await expect(page.getByText("Pickup scheduled successfully!")).toBeVisible();
     // Capacity for that slot drops by one.
@@ -218,10 +224,10 @@ test("resident and front desk complete a pickup end to end", async ({ browser, p
 
     // Move it.
     await residentTab(page, "Home").click();
-    await page.getByRole("button", { name: "Reschedule" }).click();
+    await page.getByRole("button", { name: /Reschedule/i }).click();
     await expect(page.getByRole("heading", { name: /^Reschedule pickup$/i })).toBeVisible();
-    await expect(slotButtons(page).first()).toBeVisible();
-    await slotButtons(page).filter({ hasText: secondTime }).click();
+    await expect(slotByTime(page, secondTime)).toBeVisible();
+    await slotByTime(page, secondTime).click();
     await page.getByRole("button", { name: /^Confirm reschedule$/i }).click();
     await expect(page.getByText("Pickup rescheduled successfully!")).toBeVisible();
     await expect.poll(() => remainingOf(page, firstTime)).toBe(before);
