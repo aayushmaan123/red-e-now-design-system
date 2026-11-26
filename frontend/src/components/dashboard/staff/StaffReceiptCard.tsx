@@ -1,12 +1,12 @@
 /**
  * ReceiptRow — one finished pickup: who collected what, from where, and when.
- * Rendered inside a Panel (one row per pickup, hairline dividers between rows).
+ * ReceiptCard wraps a single row in a bordered panel (lists use divide-y between rows).
  */
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HandoffReceipt } from "./StaffTypes";
 import { formatDateTime } from "./format";
-import { Mono } from "./ui";
+import { Mono, Panel } from "./ui";
 
 export function ReceiptRow({
   receipt,
@@ -44,5 +44,25 @@ export function ReceiptRow({
         </p>
       </div>
     </div>
+  );
+}
+
+/** One pickup receipt in a flat panel; optional ring when it just completed. */
+export function ReceiptCard({
+  receipt,
+  highlight,
+}: {
+  receipt: HandoffReceipt;
+  highlight?: boolean;
+}) {
+  return (
+    <Panel
+      className={cn(
+        "overflow-hidden",
+        highlight && "ring-2 ring-success/30 shadow-[0_0_20px_rgba(34,197,94,0.08)]",
+      )}
+    >
+      <ReceiptRow receipt={receipt} />
+    </Panel>
   );
 }

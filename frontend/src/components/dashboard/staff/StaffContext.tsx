@@ -16,6 +16,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { HandoffActions } from "./StaffHandoffActions";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -195,6 +196,7 @@ export interface StaffState {
   openSignoff: (a: PickupAppointment) => void;
   handleSignoff: (e: React.FormEvent, a: PickupAppointment) => Promise<void>;
   handleCompleteHandoff: () => Promise<void>;
+  renderHandoffActions: (a: PickupAppointment) => ReactNode;
 }
 
 const Ctx = createContext<StaffState | null>(null);
@@ -757,6 +759,11 @@ export function StaffProvider({ children }: { children: ReactNode }) {
     setHandoffTarget(null);
   };
 
+  const renderHandoffActions = useCallback(
+    (appointment: PickupAppointment) => <HandoffActions appointment={appointment} />,
+    [],
+  );
+
   /* ── Provide everything ── */
   const value: StaffState = {
     user, logout,
@@ -788,6 +795,7 @@ export function StaffProvider({ children }: { children: ReactNode }) {
     lastReceipt, setLastReceipt, prepBusyId, prepError, completionInfo,
     hasException, handlePrepare, handleVerifyIdentity,
     openSignoff, handleSignoff, handleCompleteHandoff,
+    renderHandoffActions,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
