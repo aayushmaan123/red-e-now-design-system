@@ -2,9 +2,10 @@
  * StaffPackages — package table with search, status filter, sort.
  */
 import { Table, SearchField, StatusBadge, formatArrived } from "@/components/common";
-import { BuildingName, useStaff, STATUS_OPTIONS } from "./StaffContext";
+import { useStaff, STATUS_OPTIONS } from "./StaffContext";
 import type { PackageRecord, PackageStatus } from "@/api/packagesApi";
 import type { Column } from "@/components/common";
+import { ErrorNote, LoadError, PageHeader } from "./ui";
 
 const pkgColumns: Column<PackageRecord>[] = [
   { key: "carrier_name", header: "Carrier" },
@@ -24,7 +25,8 @@ const pkgColumns: Column<PackageRecord>[] = [
 
 export function StaffPackages() {
   const {
-    packages, loading, searchQ, setSearchQ,
+    packages, loading, packagesLoaded, packagesError, fetchPackages,
+    searchQ, setSearchQ,
     statusFilter, setStatusFilter,
     sortKey, sortDir, sortedPackages, handleSort,
     setDrawerPkg,
@@ -32,20 +34,19 @@ export function StaffPackages() {
 
   return (
     <>
-      <div className="mb-7 animate-fade-in">
-        <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-          <BuildingName /> / Management
-        </p>
-        <h1 className="font-display text-[38px] font-semibold leading-none">
-          Packages
-        </h1>
-        <p className="mt-3 text-sm text-muted-foreground">
-          {packages.length} package{packages.length !== 1 ? "s" : ""} in the system
-        </p>
-      </div>
+      <PageHeader
+        title="Packages"
+        description={`${packages.length} package${packages.length !== 1 ? "s" : ""} in the system`}
+      />
+
+      {packagesLoaded && packagesError && (
+        <ErrorNote className="mb-4" onRetry={fetchPackages}>
+          Packages could not be refreshed: {packagesError}
+        </ErrorNote>
+      )}
 
       {/* Filters */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center animate-fade-in">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex-1">
           <SearchField
             value={searchQ}
@@ -54,7 +55,9 @@ export function StaffPackages() {
             debounceMs={300}
           />
         </div>
+        <label className="sr-only" htmlFor="pkg-status-filter">Filter by status</label>
         <select
+          id="pkg-status-filter"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as PackageStatus | "")}
           className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -65,8 +68,9 @@ export function StaffPackages() {
         </select>
       </div>
 
-      {/* Table */}
-      <div className="animate-fade-in">
+      {!packagesLoaded && packagesError ? (
+        <LoadError title="Could not load packages" message={packagesError} onRetry={fetchPackages} busy={loading} />
+      ) : (
         <Table<PackageRecord>
           columns={pkgColumns}
           data={sortedPackages}
@@ -77,7 +81,7 @@ export function StaffPackages() {
           onRowClick={(r) => setDrawerPkg(r)}
           emptyMessage={loading ? "Loading packages…" : "No packages found"}
         />
-      </div>
+      )}
     </>
   );
 }

@@ -1,39 +1,57 @@
 /**
  * StaffPickupSettings — configure pickup hours and capacity.
  */
-import { Card, Button } from "@/components/common";
+import { useId } from "react";
+import { Button } from "@/components/common";
 import { BuildingName, useStaff } from "./StaffContext";
+import { ErrorNote, LoadError, LoadingRows, PageHeader, Panel, SuccessNote, controlClass } from "./ui";
 
 export function StaffPickupSettings() {
   const {
     schedulingSettings, setSchedulingSettings,
-    settingsBusy, settingsMessage, saveSchedulingSettings,
+    settingsLoading, settingsLoadError, loadSchedulingSettings,
+    settingsBusy, settingsSaved, settingsError, saveSchedulingSettings,
   } = useStaff();
+
+  const openId = useId();
+  const closeId = useId();
+  const slotId = useId();
+  const capacityId = useId();
+  const cutoffId = useId();
 
   return (
     <div className="space-y-6">
-      <div className="animate-fade-in">
-        <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-          <BuildingName /> / Management
-        </p>
-        <h2 className="font-display text-[38px] font-semibold leading-none">
-          Pickup Settings
-        </h2>
-        <p className="mt-3 text-sm text-muted-foreground">
-          Configure pickup hours and capacity for the current building.
-        </p>
-      </div>
+      <PageHeader
+        title="Pickup settings"
+        description={<>Hours and slot capacity for <BuildingName />.</>}
+      />
 
-      {schedulingSettings ? (
-        <Card className="space-y-5 p-5 animate-fade-in bg-card border-border">
+      {settingsLoadError && !schedulingSettings && (
+        <LoadError
+          title="Could not load pickup settings"
+          message={settingsLoadError}
+          onRetry={loadSchedulingSettings}
+          busy={settingsLoading}
+        />
+      )}
+
+      {settingsLoading && !schedulingSettings && !settingsLoadError && (
+        <Panel>
+          <LoadingRows rows={3} label="Loading pickup settings" />
+        </Panel>
+      )}
+
+      {schedulingSettings && (
+        <Panel className="space-y-5 p-5">
           <div className="grid gap-4 sm:grid-cols-2">
             {([
-              ["open_time", "Opening time"],
-              ["close_time", "Closing time"],
-            ] as const).map(([field, label]) => (
-              <label key={field} className="space-y-2 text-sm">
-                <span className="block font-medium">{label}</span>
+              ["open_time", "Opening time", openId],
+              ["close_time", "Closing time", closeId],
+            ] as const).map(([field, label, id]) => (
+              <div key={field} className="space-y-2 text-sm">
+                <label htmlFor={id} className="block font-medium">{label}</label>
                 <input
+                  id={id}
                   type="time"
                   value={schedulingSettings[field]}
                   onChange={(event) =>
@@ -42,14 +60,15 @@ export function StaffPickupSettings() {
                       [field]: event.target.value,
                     })
                   }
-                  className="min-h-11 w-full rounded-lg border border-border bg-background px-3 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className={controlClass}
                 />
-              </label>
+              </div>
             ))}
 
-            <label className="space-y-2 text-sm">
-              <span className="block font-medium">Slot duration</span>
+            <div className="space-y-2 text-sm">
+              <label htmlFor={slotId} className="block font-medium">Slot duration</label>
               <select
+                id={slotId}
                 value={schedulingSettings.slot_minutes}
                 onChange={(event) =>
                   setSchedulingSettings({
@@ -57,17 +76,18 @@ export function StaffPickupSettings() {
                     slot_minutes: Number(event.target.value),
                   })
                 }
-                className="min-h-11 w-full rounded-lg border border-border bg-background px-3 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className={controlClass}
               >
                 <option value={15}>15 minutes</option>
                 <option value={30}>30 minutes</option>
                 <option value={60}>60 minutes</option>
               </select>
-            </label>
+            </div>
 
-            <label className="space-y-2 text-sm">
-              <span className="block font-medium">Default slot capacity</span>
+            <div className="space-y-2 text-sm">
+              <label htmlFor={capacityId} className="block font-medium">Default slot capacity</label>
               <input
+                id={capacityId}
                 type="number"
                 min={1}
                 max={100}
@@ -78,15 +98,16 @@ export function StaffPickupSettings() {
                     default_capacity: Number(event.target.value),
                   })
                 }
-                className="min-h-11 w-full rounded-lg border border-border bg-background px-3 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className={controlClass}
               />
-            </label>
+            </div>
 
-            <label className="space-y-2 text-sm sm:col-span-2">
-              <span className="block font-medium">
+            <div className="space-y-2 text-sm sm:col-span-2">
+              <label htmlFor={cutoffId} className="block font-medium">
                 Cancellation cutoff (minutes before pickup)
-              </span>
+              </label>
               <input
+                id={cutoffId}
                 type="number"
                 min={0}
                 max={10080}
@@ -97,21 +118,22 @@ export function StaffPickupSettings() {
                     cancellation_cutoff_minutes: Number(event.target.value),
                   })
                 }
-                className="min-h-11 w-full rounded-lg border border-border bg-background px-3 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className={controlClass}
               />
-            </label>
+            </div>
           </div>
 
-          <Button onClick={saveSchedulingSettings} disabled={settingsBusy}>
-            {settingsBusy ? "Saving..." : "Save Scheduling Settings"}
+          <Button onClick={saveSchedulingSettings} disabled={settingsBusy} aria-busy={settingsBusy}>
+            {settingsBusy ? "Saving…" : "Save scheduling settings"}
           </Button>
-        </Card>
-      ) : (
-        <p className="text-sm text-muted-foreground">Loading scheduling settings...</p>
+        </Panel>
       )}
 
-      {settingsMessage && (
-        <p role="status" className="text-sm text-destructive">{settingsMessage}</p>
+      {settingsError && (
+        <ErrorNote onRetry={saveSchedulingSettings}>{settingsError}</ErrorNote>
+      )}
+      {settingsSaved && !settingsError && (
+        <SuccessNote>Scheduling settings saved.</SuccessNote>
       )}
     </div>
   );

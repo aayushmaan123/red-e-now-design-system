@@ -6,11 +6,12 @@ import { Archive, MapPin, Timer } from "lucide-react";
 import { Button, Card, EmptyState } from "@/components/common";
 import { BuildingName, useStaff } from "./StaffContext";
 import { pickupUrgency, formatTime } from "./StaffTypes";
+import { ErrorNote } from "./ui";
 
 export function StaffPrepQueue() {
   const {
-    prepQueue, appointmentsError, appointmentsLoading,
-    prepBusyId, handlePrepare, now,
+    prepQueue, appointmentsError, appointmentsLoading, fetchAppointments,
+    prepBusyId, prepError, handlePrepare, now,
   } = useStaff();
 
   return (
@@ -28,7 +29,10 @@ export function StaffPrepQueue() {
       </div>
 
       {appointmentsError && (
-        <p role="alert" className="mb-4 text-sm text-destructive">{appointmentsError}</p>
+        <ErrorNote className="mb-4" onRetry={fetchAppointments}>{appointmentsError}</ErrorNote>
+      )}
+      {prepError && (
+        <p role="alert" className="mb-4 text-sm text-primary">{prepError}</p>
       )}
 
       <div className="space-y-3">
