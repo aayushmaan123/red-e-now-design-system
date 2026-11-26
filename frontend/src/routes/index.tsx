@@ -1,23 +1,24 @@
-/* Landing page — dark red floating particles background, ripple buttons. */
+/* Landing page: what Red-E Now does, for residents and for the front desk. */
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight } from "lucide-react";
-import { motion } from "framer-motion";
+import {
+  ArrowRight, CalendarClock, CalendarDays, ClipboardCheck, ClipboardList, History, ListOrdered,
+  Package, PackagePlus, Receipt, RefreshCw, Smartphone, UserCheck,
+} from "lucide-react";
 import { ThemeTabs, Wordmark, labelClass } from "@/components/common";
-import { useTheme } from "@/hooks/useTheme";
+import { ButtonLink, focusRing, quietLink } from "@/components/landing/ButtonLink";
 import { PickupBoardPreview } from "@/components/landing/PickupBoardPreview";
-import { AudienceBlock, StackingSteps, revealEase, revealViewport, type Audience, type Step } from "@/components/landing/ScrollSections";
-import { ArrivesIcon, HandoffIcon, SlotIcon } from "@/components/landing/StepIcons";
-import { Floating3DParticles } from "@/components/ui/floating-3d-particles";
-import { RippleButton } from "@/components/ui/ripple-button";
+import { Reveal, StackingSteps, type Step } from "@/components/landing/ScrollSections";
+import { FactList, FeatureGrid, SectionHeading, container, sectionTitle, type Fact, type Feature } from "@/components/landing/Sections";
+import { ArrivesVignette, HandoffVignette, SlotVignette } from "@/components/landing/StepVignettes";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Red-E Now | Package Pickup, Reimagined" },
-      { name: "description", content: "Book a pickup slot for your packages. The front desk has them ready before you walk in." },
-      { property: "og:title", content: "Red-E Now | Package Pickup, Reimagined" },
-      { property: "og:description", content: "Book a pickup slot. Your packages are ready when you arrive." },
+      { title: "Red-E Now | Package pickup, by appointment" },
+      { name: "description", content: "Residents book a pickup slot for their packages. The front desk sees every booking, prepares the packages and records a verified handoff." },
+      { property: "og:title", content: "Red-E Now | Package pickup, by appointment" },
+      { property: "og:description", content: "Book a pickup slot for your packages. The front desk prepares them and records the handoff." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -25,43 +26,85 @@ export const Route = createFileRoute("/")({
   component: LandingPage,
 });
 
+/* ── Content. Every line describes something the app does today. ── */
+
 const steps: Step[] = [
-  { n: "01", title: "It arrives", body: "The desk logs each delivery against your unit. It shows up on your home screen with the carrier and tracking number.", Icon: ArrivesIcon },
-  { n: "02", title: "You pick a slot", body: "Choose a pickup window that suits you, today or later in the week. Move or cancel it if plans change.", Icon: SlotIcon },
-  { n: "03", title: "Walk in, walk out", body: "Your packages are pulled and waiting. Check in, the desk verifies who you are and records the handoff, done.", Icon: HandoffIcon },
-];
-
-const audiences: Audience[] = [
   {
-    eyebrow: "Residents",
-    title: "No more digging through the package room",
-    points: ["See every package waiting for your unit", "Book, move or cancel a pickup slot", "Track each pickup from prepped to handed off"],
-    cta: { to: "/signup", label: "Create an account" },
-    direction: "left",
+    n: "01",
+    label: "At the desk",
+    title: "The desk logs the delivery",
+    body: "Staff register each package to a resident with its carrier, tracking number and storage location. It appears in your package list, and you can book it once the desk marks it available.",
+    visual: <ArrivesVignette />,
   },
   {
-    eyebrow: "Front desk",
-    title: "One board for every pickup today",
-    points: ["Register a package in a few keystrokes", "Prep queue ordered by pickup time", "Verified handoff with a receipt and audit trail"],
-    cta: { to: "/staff/login", label: "Staff sign in" },
-    direction: "right",
+    n: "02",
+    label: "On your phone",
+    title: "You book a pickup slot",
+    body: "Pick a day and a time window that still has places left. If your plans change, move the pickup or cancel it.",
+    visual: <SlotVignette />,
+  },
+  {
+    n: "03",
+    label: "At pickup",
+    title: "Check in and collect",
+    body: "Check in from your phone when you arrive. The desk confirms who you are, records who signed for the package and completes the pickup. The receipt stays in your history.",
+    visual: <HandoffVignette />,
   },
 ];
 
-const btn = "inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-[15px] font-semibold tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
-const btnPrimary = cn(btn, "bg-primary text-primary-foreground shadow-bezel-sm hover:bg-primary-hover");
-const btnSecondary = cn(btn, "border border-border-strong text-foreground hover:bg-accent");
+const residentFeatures: Feature[] = [
+  { icon: Package, title: "Your packages only", body: "Each package logged for you, with its carrier, tracking number and arrival time." },
+  { icon: CalendarClock, title: "Book a pickup slot", body: "Choose a day and a time window. Each slot shows how many places are left." },
+  { icon: RefreshCw, title: "Move or cancel", body: "Change the time or cancel the pickup yourself, without calling the desk." },
+  { icon: UserCheck, title: "Check in on arrival", body: "Check in from your phone so the desk knows you are there." },
+  { icon: Receipt, title: "Receipts in your history", body: "Every completed pickup is kept with the package details and the time it was handed over." },
+  { icon: Smartphone, title: "Nothing to install", body: "Red-E Now runs in the browser on your phone or computer." },
+];
+
+const deskFeatures: Feature[] = [
+  { icon: PackagePlus, title: "Register packages", body: "Log the carrier, tracking number, resident and storage location as deliveries come in." },
+  { icon: ClipboardList, title: "Today's pickups", body: "Every booking for the day in one list, with who has checked in." },
+  { icon: ListOrdered, title: "Preparation queue", body: "See which packages to pull next and where they are stored." },
+  { icon: ClipboardCheck, title: "Verified handoff", body: "Confirm identity, record who signed for the package, then complete the pickup." },
+  { icon: History, title: "Receipt and audit trail", body: "Each package keeps a record of what happened to it, when, and who did it." },
+  { icon: CalendarDays, title: "Pickup hours and capacity", body: "Set when the desk takes pickups and how many bookings fit in a slot." },
+];
+
+const facts: Fact[] = [
+  { question: "How do I get an account?", answer: "Ask the front desk for your building code, then sign up with your name, email and unit number." },
+  { question: "Will I be notified when a package arrives?", answer: "No. Red-E Now does not send emails, texts or push notifications. Open it to see what is waiting for you." },
+  { question: "Is there an app to download?", answer: "No. It is a website, so it works in the browser on a phone or a desk computer." },
+  { question: "What if I forget my password?", answer: "There are no reset emails. The front desk can issue a temporary password once they have confirmed who you are." },
+];
+
+/* ── Page ── */
+
+const navLink = cn(quietLink, "px-3 py-2 text-sm");
 
 function Nav() {
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-md">
-      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Wordmark />
+    <header className="sticky top-0 z-30 border-b border-border bg-background/75 backdrop-blur-xl">
+      <a
+        href="#main"
+        className={cn("sr-only rounded-md bg-card px-3 py-2 text-sm font-medium text-foreground focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40", focusRing)}
+      >
+        Skip to content
+      </a>
+      <nav aria-label="Main" className={cn(container, "flex h-16 items-center justify-between gap-3")}>
+        <div className="flex items-center gap-6">
+          <Wordmark />
+          <div className="hidden items-center lg:flex">
+            <a href="#how" data-testid="nav-how-link" className={navLink}>How it works</a>
+            <a href="#residents" className={navLink}>Residents</a>
+            <a href="#front-desk" className={navLink}>Front desk</a>
+            <a href="#questions" className={navLink}>Questions</a>
+          </div>
+        </div>
         <div className="flex items-center gap-1 sm:gap-2">
-          <a href="#how" data-testid="nav-how-link" className="hidden rounded-md px-3 py-2 text-[15px] text-muted-foreground transition-colors hover:text-foreground sm:inline-block">How it works</a>
-          <Link to="/login" data-testid="nav-signin-link" className="whitespace-nowrap rounded-md px-3 py-2 text-[15px] text-muted-foreground transition-colors hover:text-foreground">Sign in</Link>
-          <ThemeTabs compact className="shrink-0 sm:mx-1" />
-          <Link to="/staff/login" data-testid="nav-staff-portal-link" className={cn(btnSecondary, "hidden h-9 whitespace-nowrap px-3.5 text-sm sm:inline-flex")}>Staff portal</Link>
+          <ThemeTabs compact className="shrink-0" />
+          <Link to="/staff/login" data-testid="nav-staff-portal-link" className={cn(navLink, "hidden whitespace-nowrap md:inline-block")}>Staff sign in</Link>
+          <Link to="/login" data-testid="nav-signin-link" className={cn(navLink, "whitespace-nowrap")}>Sign in</Link>
+          <ButtonLink to="/signup" variant="inverse" size="sm" className="hidden sm:inline-flex">Create account</ButtonLink>
         </div>
       </nav>
     </header>
@@ -69,62 +112,63 @@ function Nav() {
 }
 
 function Hero() {
-  const ease = [0.23, 1, 0.32, 1] as const;
-
   return (
-    <section data-testid="hero-section" className="relative isolate min-h-[90vh] overflow-hidden">
-      <div aria-hidden="true" className="dot-field" />
-      <div aria-hidden="true" className="hero-streaks"><i /><i /><i /><i /></div>
-      <div className="mx-auto grid min-h-[90vh] max-w-6xl content-center items-center gap-12 px-4 pb-16 pt-28 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-14">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease }}
-        >
-          <p className={labelClass}>Package pickup for apartment buildings</p>
-          <h1 data-testid="hero-headline" className="mt-4 font-display text-[44px] font-medium leading-[0.95] tracking-[-0.022em] sm:text-6xl lg:text-[54px]">
-            Every package,<br />on the board.
-          </h1>
-          <p className="mt-6 max-w-[42ch] text-lg leading-relaxed text-muted-foreground">
-            Book a pickup slot from your phone. The desk sees it the moment it's booked, and your packages are ready when you walk in.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <RippleButton rippleColor="#e40000" duration="700ms" className={btnPrimary} onClick={() => window.location.href = "/login"}>
-              <span className="flex items-center gap-2" data-testid="hero-book-pickup-btn">Book a pickup <ArrowRight size={17} /></span>
-            </RippleButton>
-            <RippleButton rippleColor="currentColor" duration="700ms" className={btnSecondary} onClick={() => window.location.href = "/staff/login"}>
-              <span data-testid="hero-staff-signin-btn">Staff sign in</span>
-            </RippleButton>
+    <section data-testid="hero-section" className={cn(container, "pt-16 sm:pt-24 lg:pt-28")}>
+      {/* CSS entrance (not JS), so the headline is readable before hydration. */}
+      <div className="animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-700">
+        <p className={cn(labelClass, "text-[13px]")}>Package pickup for apartment buildings</p>
+        <h1 data-testid="hero-headline" className="mt-5 text-[42px] font-medium leading-[1.02] tracking-[-0.03em] sm:text-[56px] lg:text-[68px]">
+          Package pickup,<br />by appointment.
+        </h1>
+        <p className="mt-6 max-w-[52ch] text-[17px] leading-relaxed text-muted-foreground sm:text-lg">
+          Residents book a pickup slot from their phone. The front desk sees every booking on one board, gets the
+          packages ready and records a verified handoff.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-x-12 gap-y-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <ButtonLink to="/signup" size="lg" data-testid="hero-signup-link">
+              Create an account <ArrowRight size={16} aria-hidden="true" />
+            </ButtonLink>
+            <ButtonLink to="/login" variant="secondary" size="lg" data-testid="hero-signin-link">Sign in</ButtonLink>
           </div>
-          <p className="mt-5 text-sm text-muted-foreground">
-            New to your building?{" "}
-            <Link to="/signup" data-testid="hero-signup-link" className="font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors hover:decoration-primary">
-              Create an account
+          <p className="text-sm text-muted-foreground">
+            <span className="mr-3 font-medium text-foreground">Front desk</span>
+            <Link to="/staff/login" data-testid="hero-staff-signin-link" className={cn(quietLink, "inline-flex items-center gap-1.5")}>
+              Staff sign in <ArrowRight size={14} aria-hidden="true" />
             </Link>
           </p>
-        </motion.div>
-        <PickupBoardPreview />
+        </div>
+        <p className="mt-5 text-sm text-muted-foreground">You need your building code to sign up. The front desk has it.</p>
       </div>
+      <PickupBoardPreview
+        fade
+        className="animate-in fade-in fill-mode-both mt-14 delay-150 duration-1000 sm:mt-20"
+      />
+    </section>
+  );
+}
+
+function Statement() {
+  return (
+    <section className={cn(container, "py-24 sm:py-32")}>
+      <Reveal>
+        <p className={cn(sectionTitle, "max-w-[34ch] text-muted-foreground")}>
+          <span className="text-foreground">One schedule for the package room.</span>{" "}
+          Every package is logged to a resident, every pickup has a time, and every handoff is checked and signed for.
+        </p>
+      </Reveal>
     </section>
   );
 }
 
 function HowItWorks() {
   return (
-    <section id="how" data-testid="how-section" className="grid-field overflow-x-clip py-24 sm:py-32">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20, filter: "blur(8px)" }}
-          whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          viewport={revealViewport}
-          transition={{ duration: 0.7, ease: revealEase }}
-        >
-          <p className={labelClass}>How it works</p>
-          <h2 className="mt-3 max-w-[22ch] font-display text-3xl font-medium leading-none tracking-[-0.01em] sm:text-4xl">
-            From the loading dock to your hands
-          </h2>
-        </motion.div>
-        <div className="mt-16 sm:mt-24">
+    <section id="how" data-testid="how-section" className="scroll-mt-16 overflow-x-clip border-t border-border pt-24 sm:pt-32">
+      <div className={container}>
+        <SectionHeading label="How it works" title="From the front desk to your hands">
+          <p>Three steps, and each one is recorded. Residents and staff see the same pickup from their own side.</p>
+        </SectionHeading>
+        <div className="mt-12 sm:mt-20">
           <StackingSteps steps={steps} />
         </div>
       </div>
@@ -132,62 +176,129 @@ function HowItWorks() {
   );
 }
 
+function AudienceSection({ id, label, title, lead, cta, features }: {
+  id: string; label: string; title: string; lead: string;
+  cta: { to: "/signup" | "/staff/login"; label: string };
+  features: Feature[];
+}) {
+  return (
+    <section id={id} className="scroll-mt-16 border-t border-border py-24 sm:py-32">
+      <div className={container}>
+        <SectionHeading label={label} title={title}>
+          <p>{lead}</p>
+          <Link to={cta.to} className={cn(focusRing, "mt-5 inline-flex items-center gap-1.5 rounded-sm text-[15px] font-medium text-foreground transition-colors hover:text-muted-foreground")}>
+            {cta.label} <ArrowRight size={15} aria-hidden="true" />
+          </Link>
+        </SectionHeading>
+        <FeatureGrid features={features} className="mt-12 sm:mt-16" />
+      </div>
+    </section>
+  );
+}
+
+function Questions() {
+  return (
+    <section id="questions" className="scroll-mt-16 border-t border-border py-24 sm:py-32">
+      <div className={container}>
+        <SectionHeading label="Good to know" title="Plain answers" />
+        <FactList facts={facts} className="mt-10 sm:mt-14" />
+      </div>
+    </section>
+  );
+}
+
+function ClosingCall() {
+  return (
+    <section className="border-t border-border py-24 sm:py-32">
+      <Reveal className={cn(container, "flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between")}>
+        <div>
+          <h2 className={cn(sectionTitle, "max-w-[16ch]")}>Have your building code?</h2>
+          <p className="mt-4 max-w-[46ch] text-[17px] leading-relaxed text-muted-foreground">
+            Create an account with your unit number and book your first pickup.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <ButtonLink to="/signup" size="lg">Create an account <ArrowRight size={16} aria-hidden="true" /></ButtonLink>
+          <ButtonLink to="/login" variant="secondary" size="lg">Sign in</ButtonLink>
+        </div>
+      </Reveal>
+    </section>
+  );
+}
+
+const footerLink = cn(quietLink, "inline-block py-1 text-sm");
+
 function Footer() {
   return (
-    <footer className="flex min-h-[40vh] items-end">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <Wordmark />
-        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-          <Link to="/login" className="transition-colors hover:text-foreground">Resident sign in</Link>
-          <Link to="/signup" className="transition-colors hover:text-foreground">Create an account</Link>
-          <Link to="/staff/login" className="transition-colors hover:text-foreground">Staff portal</Link>
+    <footer className="border-t border-border">
+      <div className={cn(container, "grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))]")}>
+        <div>
+          <Wordmark />
+          <p className="mt-4 max-w-[30ch] text-sm leading-relaxed text-muted-foreground">Package pickup scheduling for apartment buildings.</p>
         </div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">© {new Date().getFullYear()} Red-E Now</p>
+        <nav aria-label="Residents">
+          <p className={labelClass}>Residents</p>
+          <ul className="mt-3">
+            <li><Link to="/login" className={footerLink}>Sign in</Link></li>
+            <li><Link to="/signup" className={footerLink}>Create an account</Link></li>
+            <li><Link to="/forgot-password" className={footerLink}>Password help</Link></li>
+          </ul>
+        </nav>
+        <nav aria-label="Front desk">
+          <p className={labelClass}>Front desk</p>
+          <ul className="mt-3">
+            <li><Link to="/staff/login" className={footerLink}>Staff sign in</Link></li>
+            <li><Link to="/staff/forgot-password" className={footerLink}>Staff password help</Link></li>
+          </ul>
+        </nav>
+        <nav aria-label="On this page">
+          <p className={labelClass}>On this page</p>
+          <ul className="mt-3">
+            <li><a href="#how" className={footerLink}>How it works</a></li>
+            <li><a href="#residents" className={footerLink}>For residents</a></li>
+            <li><a href="#front-desk" className={footerLink}>For the front desk</a></li>
+            <li><a href="#questions" className={footerLink}>Good to know</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div className="border-t border-border">
+        <div className={cn(container, "flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between")}>
+          <p className="text-[13px] text-muted-foreground">© {new Date().getFullYear()} Red-E Now</p>
+          <ThemeTabs />
+        </div>
       </div>
     </footer>
   );
 }
 
-const PARTICLES = {
-  dark: { color: "#7f1d1d", opacity: 0.2 },
-  light: { color: "#dc0000", opacity: 0.1 },
-  red: { color: "#ff4040", opacity: 0.22 },
-} as const;
-
 function LandingPage() {
-  const { theme } = useTheme();
-  const particles = PARTICLES[theme];
   return (
-    <div className="relative bg-background text-foreground">
-      {/* Particle background — fixed to viewport, behind all content */}
-      <div className="fixed inset-0 z-0" aria-hidden="true">
-        <Floating3DParticles
-          key={theme}
-          color={particles.color}
-          quantity={300}
-          size={3}
-          opacity={particles.opacity}
-          drift={0.3}
-          depth={0.6}
-        />
-      </div>
-
-      <div className="relative z-10">
-        <Nav />
+    <div className="bg-background text-foreground">
+      <Nav />
+      <main id="main">
         <Hero />
-        <div className="section-fade" />
+        <Statement />
         <HowItWorks />
-        <div className="section-fade" />
-
-        <section className="overflow-hidden py-24 sm:py-32">
-          <div className="mx-auto grid w-full max-w-6xl gap-20 px-4 sm:px-6 md:grid-cols-2 md:gap-16">
-            {audiences.map(a => <AudienceBlock key={a.eyebrow} audience={a} />)}
-          </div>
-        </section>
-
-        <div className="section-fade" />
-        <Footer />
-      </div>
+        <AudienceSection
+          id="residents"
+          label="For residents"
+          title="Know what is waiting. Choose when to collect it."
+          lead="Sign up with your building code and unit number. You see the packages logged for you and nobody else's."
+          cta={{ to: "/signup", label: "Create an account" }}
+          features={residentFeatures}
+        />
+        <AudienceSection
+          id="front-desk"
+          label="For the front desk"
+          title="One board for the day. A record of every handoff."
+          lead="The staff console shows what has arrived, who is coming, what to pull next and who signed for it."
+          cta={{ to: "/staff/login", label: "Staff sign in" }}
+          features={deskFeatures}
+        />
+        <Questions />
+        <ClosingCall />
+      </main>
+      <Footer />
     </div>
   );
 }
