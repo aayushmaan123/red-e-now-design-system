@@ -1,9 +1,8 @@
-/* Landing page: what Red-E Now does, for residents and for the front desk. */
+/* Landing page: what Red-E Now does, and how the front desk runs the day. */
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  ArrowRight, CalendarClock, CalendarDays, ClipboardCheck, ClipboardList, History, ListOrdered,
-  Package, PackagePlus, Receipt, RefreshCw, Smartphone, UserCheck,
+  ArrowRight, ArrowUpRight, CalendarDays, ClipboardCheck, ClipboardList, History, ListOrdered, PackagePlus,
 } from "lucide-react";
 import { ThemeTabs, Wordmark, labelClass } from "@/components/common";
 import { ButtonLink, focusRing, quietLink } from "@/components/landing/ButtonLink";
@@ -54,15 +53,6 @@ const steps: Step[] = [
   },
 ];
 
-const residentFeatures: Feature[] = [
-  { icon: Package, title: "Your packages only", body: "Each package logged for you, with its carrier, tracking number and arrival time." },
-  { icon: CalendarClock, title: "Book a pickup slot", body: "Choose a day and a time window. Each slot shows how many places are left." },
-  { icon: RefreshCw, title: "Move or cancel", body: "Change the time or cancel the pickup yourself, without calling the desk." },
-  { icon: UserCheck, title: "Check in on arrival", body: "Check in from your phone so the desk knows you are there." },
-  { icon: Receipt, title: "Receipts in your history", body: "Every completed pickup is kept with the package details and the time it was handed over." },
-  { icon: Smartphone, title: "Nothing to install", body: "Red-E Now runs in the browser on your phone or computer." },
-];
-
 const deskFeatures: Feature[] = [
   { icon: PackagePlus, title: "Register packages", body: "Log the carrier, tracking number, resident and storage location as deliveries come in." },
   { icon: ClipboardList, title: "Today's pickups", body: "Every booking for the day in one list, with who has checked in." },
@@ -74,33 +64,71 @@ const deskFeatures: Feature[] = [
 
 /* ── Page ── */
 
-const navLink = cn(quietLink, "px-3 py-2 text-sm");
+/** Pill nav link — soft until hover, then a white (foreground) highlight capsule. */
+const pillLink = cn(
+  "inline-flex items-center rounded-full px-3.5 py-2 text-sm font-medium text-foreground/75",
+  "transition-[background-color,color,transform] duration-200 ease-out",
+  "hover:bg-foreground hover:text-background hover:scale-[1.02]",
+  "active:scale-[0.98]",
+  focusRing,
+);
 
 function Nav() {
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/75 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 px-3 pt-4 sm:px-4 sm:pt-5">
       <a
         href="#main"
         className={cn("sr-only rounded-md bg-card px-3 py-2 text-sm font-medium text-foreground focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40", focusRing)}
       >
         Skip to content
       </a>
-      <nav aria-label="Main" className={cn(container, "flex h-16 items-center justify-between gap-3")}>
-        <div className="flex items-center gap-6">
-          <Wordmark />
-          <div className="hidden items-center lg:flex">
-            <a href="#how" data-testid="nav-how-link" className={navLink}>How it works</a>
-            <a href="#residents" className={navLink}>Residents</a>
-            <a href="#front-desk" className={navLink}>Front desk</a>
-          </div>
-        </div>
-        <div className="flex items-center gap-1 sm:gap-2">
+      <div className="relative mx-auto flex max-w-5xl items-center justify-center">
+        <nav
+          aria-label="Main"
+          className={cn(
+            "flex max-w-full items-center gap-0.5 rounded-full border border-border/80",
+            "bg-background/45 px-1.5 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-2xl",
+            "supports-[backdrop-filter]:bg-background/35",
+          )}
+        >
+          <Wordmark className="mr-1 rounded-full px-2.5 py-1.5 [&_span:last-child]:text-[15px]" />
+
+          <a href="#how" data-testid="nav-how-link" className={cn(pillLink, "hidden lg:inline-flex")}>
+            How it works
+          </a>
+          <a href="#front-desk" className={cn(pillLink, "hidden lg:inline-flex")}>
+            Front desk
+          </a>
+          <Link
+            to="/staff/login"
+            data-testid="nav-staff-portal-link"
+            className={cn(pillLink, "hidden whitespace-nowrap md:inline-flex")}
+          >
+            Staff sign in
+          </Link>
+          <Link
+            to="/login"
+            data-testid="nav-signin-link"
+            className={cn(pillLink, "whitespace-nowrap")}
+          >
+            Sign in
+          </Link>
+
+          <ButtonLink
+            to="/signup"
+            variant="inverse"
+            size="sm"
+            className="ml-0.5 hidden rounded-full px-4 sm:inline-flex"
+          >
+            Create account
+            <ArrowUpRight size={14} aria-hidden="true" />
+          </ButtonLink>
+        </nav>
+
+        <div className="absolute right-0 top-1/2 hidden -translate-y-1/2 sm:block md:right-2">
           <ThemeTabs compact className="shrink-0" />
-          <Link to="/staff/login" data-testid="nav-staff-portal-link" className={cn(navLink, "hidden whitespace-nowrap md:inline-block")}>Staff sign in</Link>
-          <Link to="/login" data-testid="nav-signin-link" className={cn(navLink, "whitespace-nowrap")}>Sign in</Link>
-          <ButtonLink to="/signup" variant="inverse" size="sm" className="hidden sm:inline-flex">Create account</ButtonLink>
         </div>
-      </nav>
+      </div>
     </header>
   );
 }
@@ -157,7 +185,7 @@ function Statement() {
   return (
     <section className={cn(container, "py-24 sm:py-32")}>
       <Reveal>
-        <p className={cn(sectionTitle, "max-w-[34ch]")}>
+        <p className={cn(sectionTitle, "max-w-[34ch] font-semibold text-foreground")}>
           <TextAnimate
             key={`lead-${cycle}`}
             as="span"
@@ -166,7 +194,6 @@ function Statement() {
             duration={0.4}
             startOnView={false}
             once={false}
-            className="text-foreground"
           >
             {STATEMENT_LEAD}
           </TextAnimate>{" "}
@@ -179,7 +206,6 @@ function Statement() {
             duration={0.45}
             startOnView={false}
             once={false}
-            className="text-muted-foreground"
           >
             {STATEMENT_BODY}
           </TextAnimate>
@@ -272,7 +298,6 @@ function Footer() {
           <p className={labelClass}>On this page</p>
           <ul className="mt-3">
             <li><a href="#how" className={footerLink}>How it works</a></li>
-            <li><a href="#residents" className={footerLink}>For residents</a></li>
             <li><a href="#front-desk" className={footerLink}>For the front desk</a></li>
           </ul>
         </nav>
@@ -295,14 +320,6 @@ function LandingPage() {
         <Hero />
         <Statement />
         <HowItWorks />
-        <AudienceSection
-          id="residents"
-          label="For residents"
-          title="Know what is waiting. Choose when to collect it."
-          lead="Sign up with your building code and unit number. You see the packages logged for you and nobody else's."
-          cta={{ to: "/signup", label: "Create an account" }}
-          features={residentFeatures}
-        />
         <AudienceSection
           id="front-desk"
           label="For the front desk"

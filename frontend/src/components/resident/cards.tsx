@@ -7,14 +7,15 @@ import type { ReactNode } from "react";
 import { CalendarDays, Circle, CircleAlert, CircleCheck, Clock3, LogIn, PackageCheck } from "lucide-react";
 import type { PickupAppointment } from "@/api/appointmentsApi";
 import type { PackageRecord } from "@/api/packagesApi";
-import { Button, Card, PackageCard, StatusBadge, formatArrived } from "@/components/common";
+import { Button, Card, formatArrived } from "@/components/common";
 import { cn } from "@/lib/utils";
 import { StatusLine, touchButton } from "./parts";
 import { bookingPhase, type PickupReceipt } from "./pickupState";
 import { formatDateTime, formatDay, formatRelativeDay, formatTime, formatTimeRange, formatWhen, wallClockMs } from "./time";
+import { PackageRow, ResidentStatus } from "./ui";
 
 /** What a package's status means for the resident, in one sentence. */
-function packageNote(pkg: PackageRecord, appointment: PickupAppointment | undefined, today: string) {
+export function packageNote(pkg: PackageRecord, appointment: PickupAppointment | undefined, today: string) {
   const window = appointment ? `${formatRelativeDay(appointment.pickup_start, today)}, ${formatTime(appointment.pickup_start)}` : "";
   switch (pkg.status) {
     case "received": return "At the front desk, not released yet. You can book once it is marked available.";
@@ -25,23 +26,31 @@ function packageNote(pkg: PackageRecord, appointment: PickupAppointment | undefi
   }
 }
 
-/** The shared PackageCard with a footer line explaining the status. */
-export function PackageItem({ pkg, appointment, today }: { pkg: PackageRecord; appointment?: PickupAppointment | undefined; today: string }) {
-  return (
-    <div>
-      <PackageCard
-        carrierName={pkg.carrier_name}
-        trackingCode={pkg.tracking_code}
-        status={pkg.status}
-        arrivedAt={pkg.arrived_at}
-        {...(pkg.description ? { description: pkg.description } : {})}
-        className="rounded-b-none border-b-0"
-      />
-      <p className="rounded-b-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-        {packageNote(pkg, appointment, today)}
-      </p>
-    </div>
-  );
+/** Package row with optional context action. */
+export function PackageItem({
+  pkg,
+  appointment,
+  today,
+  onBook,
+  onOpenPickup,
+}: {
+  pkg: PackageRecord;
+  appointment?: PickupAppointment | undefined;
+  today: string;
+  onBook?: (() => void) | undefined;
+  onOpenPickup?: (() => void) | undefined;
+}) {
+  const note = packageNote(pkg, appointment, today);
+  const action =
+    pkg.status === "available" && onBook
+      ? { label: "Schedule pickup", onClick: onBook, variant: "primary" as const }
+      : (pkg.status === "scheduled" || pkg.status === "prepared") && onOpenPickup
+        ? { label: "View pickup details", onClick: onOpenPickup, variant: "secondary" as const }
+        : pkg.status === "picked_up" && onOpenPickup
+          ? { label: "View receipt", onClick: onOpenPickup, variant: "ghost" as const }
+          : undefined;
+
+  return <PackageRow pkg={pkg} note={note} {...(action ? { action } : {})} />;
 }
 
 /** Progress through the front-desk handoff after the resident checks in. */
@@ -94,22 +103,26 @@ export function BookingCard({ appointment, now, today, busy, onReschedule, onCan
   const windowPassed = phase === "booked" && now > wallClockMs(appointment.pickup_end);
 
   return (
-    <Card>
+    <Card className="overflow-hidden rounded-2xl">
       <div className="p-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
-            <CalendarDays size={16} aria-hidden="true" className="shrink-0 text-muted-foreground" />
-            <p className="text-[15px] font-semibold">
-              {day}
-              {day !== date && <span className="ml-2 text-sm font-normal text-muted-foreground">{date}</span>}
-            </p>
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/60 text-muted-foreground">
+              <CalendarDays size={16} aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[15px] font-semibold tracking-[-0.01em]">
+                {day}
+                {day !== date && <span className="ml-2 text-sm font-normal text-muted-foreground">{date}</span>}
+              </p>
+              <p className="mt-0.5 font-mono text-[15px] text-foreground">
+                {formatTimeRange(appointment.pickup_start, appointment.pickup_end)}
+              </p>
+            </div>
           </div>
-          <StatusBadge status={appointment.package_status === "prepared" ? "prepared" : "scheduled"} />
+          <ResidentStatus status={appointment.package_status === "prepared" ? "prepared" : "scheduled"} />
         </div>
-        <p className="mt-1.5 pl-[26px] font-mono text-[15px] text-foreground">
-          {formatTimeRange(appointment.pickup_start, appointment.pickup_end)}
-        </p>
-        <p className="mt-1 pl-[26px] text-sm text-muted-foreground">
+        <p className="mt-3 text-sm text-muted-foreground">
           {appointment.carrier_name}
           {appointment.tracking_code && <> · <span className="break-all font-mono text-[13px] text-foreground/90">{appointment.tracking_code}</span></>}
         </p>
@@ -184,10 +197,10 @@ function ReceiptRow({ label, children }: { label: string; children: ReactNode })
 /** Receipt for a completed pickup. */
 export function ReceiptCard({ receipt }: { receipt: PickupReceipt }) {
   return (
-    <Card>
+    <Card className="overflow-hidden rounded-2xl">
       <div className="flex items-center gap-2.5 border-b border-border px-4 py-3">
         <CircleCheck size={16} strokeWidth={1.8} aria-hidden="true" className="shrink-0 text-success-foreground" />
-        <h3 className="font-display text-[15px] font-semibold tracking-[-0.01em]">Package picked up</h3>
+        <h3 className="text-[15px] font-semibold tracking-[-0.01em]">Package picked up</h3>
       </div>
       <dl className="divide-y divide-border px-4 text-sm">
         <ReceiptRow label="Picked up">

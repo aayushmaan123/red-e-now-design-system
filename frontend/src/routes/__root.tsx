@@ -11,6 +11,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -21,6 +22,7 @@ import { MotionConfig } from "framer-motion";
 
 import appCss from "../styles.css?url";
 import { MetalBackdrop } from "@/components/common/MetalBackdrop";
+import { LandingAtmosphere } from "@/components/landing/LandingAtmosphere";
 import { AuthProvider } from "@/context/AuthContext";
 import { themeInitScript } from "@/hooks/useTheme";
 
@@ -124,6 +126,12 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+/** Landing gets the anime.js atmosphere; every other surface keeps the metal stage. */
+function RootBackdrop() {
+  const isLanding = useRouterState({ select: (s) => s.location.pathname === "/" });
+  return isLanding ? <LandingAtmosphere /> : <MetalBackdrop />;
+}
+
 // App-level providers — MotionConfig for reduced-motion, React Query for data, AuthProvider for user state
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
@@ -131,9 +139,14 @@ function RootComponent() {
   return (
     <MotionConfig reducedMotion="user">
     <QueryClientProvider client={queryClient}>
-      <MetalBackdrop />
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <AuthProvider><Outlet /></AuthProvider>
+      <RootBackdrop />
+      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes.
+          relative z-10 keeps page content above the landing atmosphere (z-0). */}
+      <AuthProvider>
+        <div className="relative z-10">
+          <Outlet />
+        </div>
+      </AuthProvider>
       <Toaster
         theme="system"
         position="top-center"

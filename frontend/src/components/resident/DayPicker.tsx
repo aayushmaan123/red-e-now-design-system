@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { TextInput } from "@/components/common";
 import { cn } from "@/lib/utils";
 import { addDays, formatDayLong, parseWallClock } from "./time";
+import { focusRing } from "./ui";
 
 const STRIP_DAYS = 7;
 
@@ -26,38 +27,44 @@ export function DayPicker({ date, today, openByDay, onChoose }: {
   const days = Array.from({ length: STRIP_DAYS }, (_, offset) => addDays(today, offset));
 
   return (
-    <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start">
-      <div role="group" aria-label="Next 7 days" className="grid grid-cols-7 overflow-hidden rounded-md border border-input bg-card">
+    <div className="grid gap-4">
+      <div role="group" aria-label="Next 7 days" className="grid grid-cols-7 gap-1.5">
         {days.map((day, offset) => {
           const parsed = parseWallClock(day);
           const selected = day === date;
           const closed = openByDay[day] === 0;
+          const isToday = offset === 0;
           return (
             <button
               key={day}
               type="button"
               aria-pressed={selected}
-              aria-label={`${formatDayLong(day)}${offset === 0 ? ", today" : ""}${closed ? ", no open times" : ""}`}
+              aria-label={`${formatDayLong(day)}${isToday ? ", today" : ""}${closed ? ", no open times" : ""}`}
               onClick={() => onChoose(day)}
               className={cn(
-                "relative flex h-14 flex-col items-center justify-center gap-0.5 border-l border-border transition-colors first:border-l-0",
-                "focus-visible:z-[1] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
-                selected ? "bg-foreground text-background" : "text-foreground hover:bg-muted",
+                "relative flex h-16 flex-col items-center justify-center gap-0.5 rounded-xl border transition-colors",
+                focusRing,
+                selected
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-foreground hover:border-border-strong hover:bg-muted/60",
               )}
             >
-              <span className={cn("text-[11px] font-medium", !selected && "text-muted-foreground")}>
-                {offset === 0 ? "Today" : parsed?.toLocaleDateString(undefined, { weekday: "short" })}
+              <span className={cn("text-[10px] font-medium uppercase tracking-wide", selected ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                {isToday ? "Today" : parsed?.toLocaleDateString(undefined, { weekday: "short" })}
               </span>
-              <span className={cn("font-mono text-[15px] font-medium tabular-nums", closed && !selected && "text-muted-foreground line-through")}>
+              <span className={cn("font-mono text-[15px] font-semibold tabular-nums", closed && !selected && "text-muted-foreground line-through")}>
                 {parsed?.getDate()}
               </span>
+              {isToday && !selected && (
+                <span aria-hidden="true" className="absolute bottom-1.5 size-1 rounded-full bg-primary" />
+              )}
             </button>
           );
         })}
       </div>
 
       <TextInput
-        label="Pickup date"
+        label="Or pick another date"
         type="date"
         min={today}
         value={draft}
@@ -67,7 +74,7 @@ export function DayPicker({ date, today, openByDay, onChoose }: {
           if (value && value >= today) onChoose(value);
         }}
         onBlur={() => setDraft(date)}
-        className="h-11 font-mono"
+        className="h-11 rounded-xl font-mono"
         {...(tooEarly ? { error: "Choose today or a later day." } : {})}
       />
     </div>

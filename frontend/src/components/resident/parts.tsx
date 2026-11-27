@@ -7,6 +7,7 @@ import { type ComponentProps, type ReactNode, useId } from "react";
 import { ChevronDown, CircleAlert, CircleCheck, type LucideIcon } from "lucide-react";
 import { Button, Card, EmptyState, labelClass } from "@/components/common";
 import { cn } from "@/lib/utils";
+import { focusRing } from "./ui";
 
 /** 44px touch target on phones, the standard 40px control height from `sm` up. */
 export const touchButton = "h-11 sm:h-10";
@@ -14,10 +15,16 @@ export const touchButton = "h-11 sm:h-10";
 /** Page title for a tab: one h1, an optional line under it and one optional action. */
 export function PageHeader({ title, description, action }: { title: ReactNode; description?: ReactNode; action?: ReactNode }) {
   return (
-    <header className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3 sm:mb-8">
+    <header className="mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-3 sm:mb-7">
       <div className="min-w-0">
-        <h1 className="font-display text-[26px] font-semibold leading-[1.15] tracking-[-0.022em] text-foreground sm:text-[30px]">{title}</h1>
-        {description && <p className="mt-1.5 text-[15px] leading-snug text-muted-foreground">{description}</p>}
+        <h1 className="text-[26px] font-semibold leading-[1.12] tracking-[-0.025em] text-foreground sm:text-[30px]">
+          {title}
+        </h1>
+        {description && (
+          <p className="mt-1.5 max-w-[42ch] text-[14px] leading-snug text-muted-foreground sm:text-[15px]">
+            {description}
+          </p>
+        )}
       </div>
       {action}
     </header>
@@ -28,9 +35,13 @@ export function PageHeader({ title, description, action }: { title: ReactNode; d
 export function SectionHeading({ title, count, action, className }: { title: string; count?: number; action?: ReactNode; className?: string }) {
   return (
     <div className={cn("mb-3 flex min-h-6 items-center justify-between gap-3", className)}>
-      <h2 className="font-display text-[15px] font-semibold tracking-[-0.01em] text-foreground">
+      <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-foreground">
         {title}
-        {count !== undefined && <span className="ml-2 font-mono text-xs font-normal tabular-nums text-muted-foreground">{count}</span>}
+        {count !== undefined && (
+          <span className="ml-2 font-mono text-[12px] font-normal tabular-nums text-muted-foreground">
+            {count}
+          </span>
+        )}
       </h2>
       {action}
     </div>
@@ -48,8 +59,8 @@ export function Notice({ kind, children, action, className }: { kind: "success" 
     <div
       role={kind === "error" ? "alert" : "status"}
       className={cn(
-        "flex items-center gap-2.5 rounded-md border px-3 py-2.5 text-sm text-foreground",
-        kind === "error" ? "border-destructive/40 tint-primary" : "border-border bg-muted",
+        "flex items-center gap-2.5 rounded-xl border px-3.5 py-3 text-sm text-foreground",
+        kind === "error" ? "border-destructive/40 tint-primary" : "border-border bg-muted/80",
         className,
       )}
     >
@@ -63,8 +74,13 @@ export function Notice({ kind, children, action, className }: { kind: "success" 
 /** Placeholder while a list loads for the first time. */
 export function ListLoading({ label }: { label: string }) {
   return (
-    <Card className="px-4 py-6">
-      <p role="status" className="text-sm text-muted-foreground">{label}</p>
+    <Card className="rounded-2xl px-4 py-7">
+      <div className="space-y-3" role="status" aria-label={label}>
+        <div className="h-3 w-2/5 animate-pulse rounded-full bg-muted" />
+        <div className="h-3 w-4/5 animate-pulse rounded-full bg-muted" />
+        <div className="h-3 w-3/5 animate-pulse rounded-full bg-muted" />
+        <p className="pt-1 text-sm text-muted-foreground">{label}</p>
+      </div>
     </Card>
   );
 }
@@ -72,7 +88,7 @@ export function ListLoading({ label }: { label: string }) {
 /** A list that could not be loaded: says so and offers a retry. */
 export function ListError({ title, message, onRetry, busy }: { title: string; message: string; onRetry: () => void; busy?: boolean }) {
   return (
-    <Card>
+    <Card className="rounded-2xl">
       <div role="alert">
         <EmptyState
           icon={CircleAlert}
@@ -107,7 +123,8 @@ export function SelectField({ label, helperText, className, id, children, ...pro
           {...props}
           aria-describedby={helperText ? `${fieldId}-note` : undefined}
           className={cn(
-            "h-11 w-full appearance-none rounded-md border border-input bg-card pl-3 pr-9 text-[15px] text-foreground outline-none transition-[border-color] hover:border-muted-foreground/40 focus:border-muted-foreground/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60",
+            "h-11 w-full appearance-none rounded-xl border border-input bg-card pl-3.5 pr-9 text-[15px] text-foreground outline-none transition-[border-color] hover:border-muted-foreground/40 focus:border-muted-foreground/60 disabled:cursor-not-allowed disabled:opacity-60",
+            focusRing,
             className,
           )}
         >

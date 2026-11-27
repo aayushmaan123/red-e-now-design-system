@@ -10,6 +10,7 @@ import { BookingCard, PackageItem } from "./cards";
 import { ListError, ListLoading, Notice, PageHeader, RefreshError, SectionHeading, touchButton } from "./parts";
 import type { NextStep } from "./pickupState";
 import { formatRelativeDay, formatTimeRange, formatWhen } from "./time";
+import { CountStrip } from "./ui";
 import type { Booking } from "./useBooking";
 import type { ResidentData } from "./useResidentData";
 
@@ -32,9 +33,9 @@ function BookingFacts({ appointment, today }: { appointment: PickupAppointment; 
 
 function StepCard({ eyebrow, title, children, facts, action }: { eyebrow: string; title: string; children: ReactNode; facts?: ReactNode; action?: ReactNode }) {
   return (
-    <Card className="p-5">
+    <Card className="rounded-2xl p-5">
       <p className={labelClass}>{eyebrow}</p>
-      <h2 className="mt-2 font-display text-[19px] font-semibold leading-snug tracking-[-0.015em] text-foreground">{title}</h2>
+      <h2 className="mt-2 text-[19px] font-semibold leading-snug tracking-[-0.02em] text-foreground">{title}</h2>
       <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{children}</p>
       {facts}
       {action && <div className="mt-5">{action}</div>}
@@ -84,7 +85,7 @@ function NextStepCard({ step, data, onBook, onOpenPickups }: {
       return (
         <StepCard
           eyebrow="Next step"
-          title={only ? "Your package is ready to book" : `${step.packages.length} packages are ready to book`}
+          title={only ? "You have packages ready for pickup" : `${step.packages.length} packages are ready for pickup`}
           facts={only && (
             <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
               {only.carrier_name} · <span className="break-all font-mono text-[13px] text-foreground/90">{only.tracking_code}</span>
@@ -110,7 +111,7 @@ function NextStepCard({ step, data, onBook, onOpenPickups }: {
       );
     case "booked":
       return (
-        <StepCard eyebrow="Nothing to do right now" title="Your pickup is booked" facts={<BookingFacts appointment={step.appointment} today={today} />}>
+        <StepCard eyebrow="Your next pickup is scheduled" title="Your pickup is booked" facts={<BookingFacts appointment={step.appointment} today={today} />}>
           The front desk will have your package ready for this window.
         </StepCard>
       );
@@ -122,8 +123,8 @@ function NextStepCard({ step, data, onBook, onOpenPickups }: {
       );
     case "none":
       return (
-        <Card>
-          <EmptyState icon={Package} message="No packages waiting for you right now" />
+        <Card className="rounded-2xl">
+          <EmptyState icon={Package} title="You're all caught up" message="No packages waiting for you right now." />
         </Card>
       );
   }
@@ -138,28 +139,32 @@ export function HomeTab({ data, booking, firstName, onBook, onReschedule, onOpen
   onOpenPackages: () => void;
   onOpenPickups: () => void;
 }) {
-  const { packages, appointments, activePackages, upcoming, receipts, step, today } = data;
+  const { packages, appointments, activePackages, availablePackages, upcoming, receipts, step, today } = data;
   const byPackage = new Map(upcoming.map((appointment) => [appointment.package_id, appointment]));
   // Hold the lead card until both lists have answered, so it does not change under the reader.
   const settled = packages.loaded && (appointments.loaded || !appointments.loading);
+  const atDesk = packages.items.filter((p) => p.status === "received" || p.status === "available" || p.status === "scheduled" || p.status === "prepared").length;
   const summary = [
-    { label: "At the desk", value: activePackages.length },
-    { label: "Booked", value: upcoming.length },
+    { label: "At the desk", value: atDesk },
+    { label: "Available", value: availablePackages.length },
+    { label: "Scheduled", value: upcoming.length },
     { label: "Picked up", value: receipts.length },
   ];
   const showSummary = settled && summary.some((entry) => entry.value > 0);
-  const showAside = showSummary || upcoming.length > 0 || Boolean(appointments.error);
+  const nextUpcoming = upcoming[0];
 
   return (
     <>
       <PageHeader
-        title={<>Welcome back, {firstName}</>}
+        title={<>Hi, {firstName}</>}
         description={data.settings?.building_name ? `Your packages at ${data.settings.building_name}.` : "Your packages at the front desk."}
       />
 
       {booking.feedback && <Notice kind={booking.feedback.kind} className="mb-4">{booking.feedback.message}</Notice>}
 
-      <div className={showAside ? "grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start" : "max-w-2xl"}>
+      <div className="space-y-6">
+        {showSummary && <CountStrip items={summary} />}
+
         <section aria-label="Next step">
           {!packages.loaded ? (
             packages.error
@@ -175,51 +180,38 @@ export function HomeTab({ data, booking, firstName, onBook, onReschedule, onOpen
           )}
         </section>
 
-        {showAside && (
-          <aside className="space-y-8 lg:row-span-2">
-            {showSummary && (
-              <dl className="grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-card">
-                {summary.map((entry) => (
-                  <div key={entry.label} className="px-4 py-3">
-                    <dt className="text-xs text-muted-foreground">{entry.label}</dt>
-                    <dd className="mt-1 font-display text-2xl font-semibold leading-none tracking-[-0.02em] tabular-nums">{entry.value}</dd>
-                  </div>
-                ))}
-              </dl>
+        {nextUpcoming && (
+          <section>
+            <SectionHeading title="Upcoming pickup" />
+            {appointments.error && (
+              appointments.loaded
+                ? <RefreshError message={appointments.error} onRetry={() => void appointments.refresh()} />
+                : <ListError title="Could not load your pickups" message={appointments.error} onRetry={() => void appointments.refresh()} busy={appointments.loading} />
             )}
-
-            {(upcoming.length > 0 || appointments.error) && (
-              <section>
-                <SectionHeading title="Upcoming pickups" {...(appointments.loaded ? { count: upcoming.length } : {})} />
-                {appointments.error && (
-                  appointments.loaded
-                    ? <RefreshError message={appointments.error} onRetry={() => void appointments.refresh()} />
-                    : <ListError title="Could not load your pickups" message={appointments.error} onRetry={() => void appointments.refresh()} busy={appointments.loading} />
-                )}
-                <div className="space-y-3">
-                  {upcoming.map((appointment) => (
-                    <BookingCard
-                      key={appointment.id}
-                      appointment={appointment}
-                      now={data.now}
-                      today={today}
-                      busy={booking.busy}
-                      onReschedule={onReschedule}
-                      onCancel={booking.requestCancel}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-          </aside>
+            <BookingCard
+              appointment={nextUpcoming}
+              now={data.now}
+              today={today}
+              busy={booking.busy}
+              onReschedule={onReschedule}
+              onCancel={booking.requestCancel}
+            />
+          </section>
         )}
 
         {activePackages.length > 0 && (
           <section>
-            <SectionHeading title="Your packages" count={activePackages.length} />
+            <SectionHeading title="Recent packages" count={activePackages.length} />
             <div className="space-y-3">
               {activePackages.slice(0, HOME_PACKAGE_LIMIT).map((pkg) => (
-                <PackageItem key={pkg.id} pkg={pkg} appointment={byPackage.get(pkg.id)} today={today} />
+                <PackageItem
+                  key={pkg.id}
+                  pkg={pkg}
+                  appointment={byPackage.get(pkg.id)}
+                  today={today}
+                  onBook={onBook}
+                  onOpenPickup={onOpenPickups}
+                />
               ))}
             </div>
             {activePackages.length > HOME_PACKAGE_LIMIT && (

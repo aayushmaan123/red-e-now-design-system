@@ -24,12 +24,19 @@ export function PickupsTab({ data, booking, onBook, onReschedule }: {
 
   return (
     <>
-      <PageHeader title="Pickups" description="Your bookings, check-in and receipts." />
+      <PageHeader
+        title="Pickups"
+        description={
+          appointments.loaded
+            ? `${upcoming.length} upcoming · ${receipts.length} past`
+            : "Your bookings, check-in and receipts."
+        }
+      />
 
       {booking.feedback && <Notice kind={booking.feedback.kind} className="mb-4">{booking.feedback.message}</Notice>}
       {data.checkInError && <Notice kind="error" className="mb-4">{data.checkInError}</Notice>}
 
-      <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
+      <div className="space-y-8">
         <section>
           <SectionHeading title="Upcoming" {...(appointments.loaded ? { count: upcoming.length } : {})} />
           {!appointments.loaded ? (
@@ -40,10 +47,11 @@ export function PickupsTab({ data, booking, onBook, onReschedule }: {
             <>
               {appointments.error && <RefreshError message={appointments.error} onRetry={() => void appointments.refresh()} />}
               {upcoming.length === 0 ? (
-                <Card>
+                <Card className="rounded-2xl">
                   <EmptyState
                     icon={CalendarDays}
-                    message="No pickups scheduled"
+                    title="No pickups scheduled"
+                    message="Book a time when you have a package ready at the desk."
                     {...(availablePackages.length > 0
                       ? { action: <Button variant="secondary" className={touchButton} onClick={onBook}>Schedule a pickup</Button> }
                       : {})}
@@ -79,8 +87,8 @@ export function PickupsTab({ data, booking, onBook, onReschedule }: {
             <>
               {receiptsError && !appointments.error && <RefreshError message={receiptsError} onRetry={retryAll} />}
               {receipts.length === 0 ? (
-                <Card>
-                  <EmptyState icon={History} message="Receipts appear here after you collect a package." />
+                <Card className="rounded-2xl">
+                  <EmptyState icon={History} title="No receipts yet" message="Receipts appear here after you collect a package." />
                 </Card>
               ) : (
                 <div className="space-y-3">

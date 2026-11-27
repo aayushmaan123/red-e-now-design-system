@@ -37,7 +37,8 @@ export function Reveal({ children, className, delay = 0, amount = 0.3 }: {
 
 /* ── StackingSteps ──
  * Each card sticks below the nav; the next card slides up over it like a deck.
- * Covered cards ease back to a slightly smaller scale and dim a little.
+ * One wheel notch, swipe, or arrow key eases the next card all the way up
+ * (or back down). Covered cards ease back to a slightly smaller scale and dim a little.
  * Note: no ancestor may use overflow: hidden/auto, or position: sticky stops working
  * (use overflow-x-clip).
  */
@@ -52,6 +53,165 @@ export type Step = {
 };
 
 const STACK_OFFSET = 14; // px: each card sits a little lower so the deck edges show
+
+function documentOffset(el: HTMLElement) {
+  let y = 0;
+  let node: HTMLElement | null = el;
+  while (node) {
+    y += node.offsetTop;
+    node = node.offsetParent as HTMLElement | null;
+  }
+  return y;
+}
+
+/** ScrollY where each card meets its sticky offset.
+ * Sticky boxes report a pinned offsetTop, so the static position comes from the spacer before each card. */
+function snapPoints(root: HTMLElement) {
+  const cards = [...root.querySelectorAll<HTMLElement>("[data-step-card]")];
+  const rootY = documentOffset(root);
+  return cards.map((card, i) => {
+    const stickyTop = parseFloat(getComputedStyle(card).top);
+    const top = Number.isFinite(stickyTop) ? stickyTop : 0;
+    const spacer = i > 0 ? card.previousElementSibling as HTMLElement | null : null;
+    const layout = spacer ? spacer.offsetTop + spacer.offsetHeight : 0;
+    return rootY + layout - top;
+  });
+}
+
+/** Fast pull, soft landing. Same family as the page's other ease-out motion. */
+function pullEase(t: number) {
+  return 1 - (1 - t) ** 4;
+}
+
+/**
+ * While the deck is pinned, each gesture moves exactly one card.
+ * Listeners live in an effect so the server markup stays the same.
+ */
+function useOneCardPerScroll(ref: RefObject<HTMLElement | null>, count: number) {
+  useEffect(() => {
+    const root = ref.current;
+    if (!root || count < 2) return;
+
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let frame = 0;
+    let animating = false;
+    let accum = 0;
+    let idle = 0;
+    let touchY = 0;
+    let touchX = 0;
+
+    const points = () => snapPoints(root);
+
+    const indexAt = (snaps: number[], y: number) => {
+      let index = 0;
+      for (let i = 0; i < snaps.length; i++) if (y + 8 >= snaps[i]) index = i;
+      return index;
+    };
+
+    const animateTo = (target: number) => {
+      cancelAnimationFrame(frame);
+      if (reduce || Math.abs(target - window.scrollY) < 1) {
+        window.scrollTo(0, target);
+        animating = false;
+        return;
+      }
+      const from = window.scrollY;
+      const dist = target - from;
+      const duration = Math.min(780, Math.max(560, Math.abs(dist) * 0.7));
+      const start = performance.now();
+      animating = true;
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - start) / duration);
+        window.scrollTo(0, from + dist * pullEase(t));
+        if (t < 1) frame = requestAnimationFrame(tick);
+        else animating = false;
+      };
+      frame = requestAnimationFrame(tick);
+    };
+
+    /** Where this gesture should land, or null to let the page scroll. */
+    const destination = (dir: number) => {
+      const snaps = points();
+      if (snaps.length < 2) return null;
+      const y = window.scrollY;
+      const last = snaps.length - 1;
+      if (y < snaps[0] - 8 || y > snaps[last] + 8) return null;
+      const index = indexAt(snaps, y);
+      if (dir > 0) return index >= last ? null : snaps[index + 1];
+      if (y <= snaps[0] + 8) return null;
+      return y > snaps[index] + 8 ? snaps[index] : snaps[Math.max(0, index - 1)];
+    };
+
+    const step = (dir: number) => {
+      if (animating || dir === 0) return false;
+      const target = destination(dir);
+      if (target == null) return false;
+      animateTo(target);
+      return true;
+    };
+
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+      const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * window.innerHeight : event.deltaY;
+      const dir = Math.sign(delta);
+      if (dir === 0) return;
+      if (animating) {
+        if (destination(dir) != null || destination(-dir) != null) event.preventDefault();
+        return;
+      }
+      if (destination(dir) == null) return;
+      event.preventDefault();
+      accum += delta;
+      window.clearTimeout(idle);
+      idle = window.setTimeout(() => { accum = 0; }, 160);
+      if (Math.abs(accum) < 28) return;
+      accum = 0;
+      step(dir);
+    };
+
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && target.closest("input, textarea, select, button, a, [contenteditable='true']")) return;
+      const dir = event.key === "ArrowDown" || event.key === "PageDown" ? 1 : event.key === "ArrowUp" || event.key === "PageUp" ? -1 : 0;
+      if (!dir || !step(dir)) return;
+      event.preventDefault();
+    };
+
+    const onTouchStart = (event: TouchEvent) => {
+      touchY = event.touches[0]?.clientY ?? 0;
+      touchX = event.touches[0]?.clientX ?? 0;
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const y = event.touches[0]?.clientY ?? touchY;
+      const x = event.touches[0]?.clientX ?? touchX;
+      const dy = touchY - y;
+      if (Math.abs(x - touchX) > Math.abs(dy)) return;
+      if (destination(Math.sign(dy)) == null) return;
+      event.preventDefault();
+    };
+    const onTouchEnd = (event: TouchEvent) => {
+      const y = event.changedTouches[0]?.clientY ?? touchY;
+      const dy = touchY - y;
+      if (Math.abs(dy) < 36) return;
+      step(Math.sign(dy));
+    };
+
+    window.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(idle);
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [ref, count]);
+}
 
 /**
  * Scroll progress of an element through the viewport: 0 when its top reaches the top of the
@@ -95,6 +255,7 @@ function useElementScrollProgress(ref: RefObject<HTMLElement | null>) {
 export function StackingSteps({ steps }: { steps: Step[] }) {
   const ref = useRef<HTMLOListElement>(null);
   const progress = useElementScrollProgress(ref);
+  useOneCardPerScroll(ref, steps.length);
 
   return (
     <ol ref={ref} className="relative m-0 list-none p-0 [--stack-top:76px] sm:[--stack-top:104px]">
@@ -125,7 +286,7 @@ function StackCard({ step, index, total, progress }: {
   const dim = useTransform(progress, range, [0, depth * 0.22]);
 
   return (
-    <li className="sticky" style={{ top: `calc(var(--stack-top) + ${index * STACK_OFFSET}px)` }}>
+    <li data-step-card="" className="sticky" style={{ top: `calc(var(--stack-top) + ${index * STACK_OFFSET}px)` }}>
       <motion.article
         style={{ scale, transformOrigin: "top center" }}
         className={cn(

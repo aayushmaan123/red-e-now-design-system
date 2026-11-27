@@ -8,6 +8,7 @@ import { Button } from "@/components/common";
 import { cn } from "@/lib/utils";
 import { Notice } from "./parts";
 import { dayPeriod, formatTime, type DayPeriod } from "./time";
+import { focusRing } from "./ui";
 
 const PERIODS: DayPeriod[] = ["Morning", "Afternoon", "Evening"];
 
@@ -48,14 +49,14 @@ export function SlotPicker({ slots, loading, error, onRetry, time, currentStart,
   const taken = slots.length - open.length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {PERIODS.map((period) => {
         const inPeriod = open.filter((slot) => dayPeriod(slot.pickup_start) === period);
         if (inPeriod.length === 0) return null;
         return (
           <div key={period} role="group" aria-label={`${period} times`}>
-            <p aria-hidden="true" className="mb-2 text-xs font-medium text-muted-foreground">{period}</p>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-5">
+            <p aria-hidden="true" className="mb-2 text-[12px] font-medium text-muted-foreground">{period}</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {inPeriod.map((slot) => {
                 const value = slot.pickup_start.slice(11, 16);
                 const selected = time === value;
@@ -69,17 +70,17 @@ export function SlotPicker({ slots, loading, error, onRetry, time, currentStart,
                     disabled={current}
                     onClick={() => onChoose(value)}
                     className={cn(
-                      "flex h-14 flex-col items-center justify-center gap-0.5 rounded-md border px-1 transition-colors",
-                      "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                      "flex min-h-14 flex-col items-start justify-center gap-0.5 rounded-xl border px-3.5 py-2.5 text-left transition-colors",
+                      focusRing,
                       selected
-                        ? "border-foreground bg-foreground text-background"
+                        ? "border-primary bg-primary text-primary-foreground shadow-bezel-sm"
                         : current
                           ? "cursor-not-allowed border-dashed border-border-strong text-muted-foreground"
-                          : "border-input bg-card text-foreground hover:border-muted-foreground/50 hover:bg-muted",
+                          : "border-border bg-card text-foreground hover:border-border-strong hover:bg-muted/50",
                     )}
                   >
-                    <span className="font-mono text-sm font-medium tabular-nums">{formatTime(slot.pickup_start)}</span>
-                    <span className={cn("text-[11px]", selected ? "text-background/80" : "text-muted-foreground")}>
+                    <span className="font-mono text-[15px] font-semibold tabular-nums">{formatTime(slot.pickup_start)}</span>
+                    <span className={cn("text-[11px]", selected ? "text-primary-foreground/80" : "text-muted-foreground")}>
                       {current ? "Current time" : `${slot.remaining} remaining`}
                     </span>
                   </button>
