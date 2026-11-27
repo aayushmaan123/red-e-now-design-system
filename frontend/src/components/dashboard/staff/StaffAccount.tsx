@@ -1,8 +1,8 @@
 /**
- * StaffAccount — user profile, theme toggle and logout.
+ * StaffAccount — user profile and logout.
  */
 import { LogOut } from "lucide-react";
-import { Avatar, Button, Card, ThemeTabs } from "@/components/common";
+import { Avatar, Button, Card } from "@/components/common";
 import { BuildingName, useStaff } from "./StaffContext";
 
 export function StaffAccount() {
@@ -26,16 +26,6 @@ export function StaffAccount() {
         <p className="mt-6 text-sm text-muted-foreground">
           <BuildingName /> · Management
         </p>
-
-        <div className="mt-6 flex items-center justify-between rounded-lg border border-border bg-background p-4">
-          <div>
-            <p className="text-sm font-medium">Appearance</p>
-            <p className="text-xs text-muted-foreground">
-              Dark, light or red
-            </p>
-          </div>
-          <ThemeTabs />
-        </div>
 
         <Button variant="secondary" className="mt-6" onClick={logout}>
           <LogOut size={16} /> Logout

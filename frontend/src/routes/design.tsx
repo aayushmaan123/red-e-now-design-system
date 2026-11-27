@@ -6,7 +6,6 @@ import {
   AppointmentCard, Avatar, Badge, Button, Card, DeviceFrame, EmptyState, Kbd, KpiStrip, PackageCard,
   SearchField, SectionHeader, StatCard, StatusBadge, Table, TextInput, labelClass, type Column,
 } from "@/components/common";
-import { useTheme } from "@/hooks/useTheme";
 
 export const Route = createFileRoute("/design")({
   beforeLoad: () => { if (!import.meta.env.DEV) throw notFound(); },
@@ -36,7 +35,6 @@ const board = [
 ];
 
 function DesignGallery() {
-  const { isDark, toggle } = useTheme();
   const [search, setSearch] = useState("");
   const [kpi, setKpi] = useState({ waiting: 128, today: 37, prepared: 19, handed: 1284 });
   useEffect(() => {
@@ -45,7 +43,7 @@ function DesignGallery() {
   }, []);
 
   return <main className="mx-auto max-w-6xl space-y-12 px-6 py-10">
-    <SectionHeader eyebrow="Design system v4" title="Bold Dark Ops" actions={<Button variant="secondary" onClick={toggle}>{isDark ? "Light" : "Dark"} theme</Button>} />
+    <SectionHeader eyebrow="Design system v4" title="Bold Dark Ops" />
 
     <section className="space-y-4">
       <p className={labelClass}>Buttons</p>

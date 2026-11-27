@@ -1,52 +1,44 @@
 /**
- * useTheme — shared theme state for Red-E Now.
+ * useTheme — Red-E Now is dark-only for now.
  *
- * Three themes: "dark" (default), "light", and "red".
- * One module-level store backs every useTheme() call, so a switcher in the
- * header and one in a settings card always agree.
- *
- * DOM contract (styles.css):
- *   dark  → <html class="dark">
- *   light → <html>
- *   red   → <html class="dark theme-red">   (red is a dark-family theme)
- * The same logic runs as an inline script in __root.tsx before first paint.
+ * Light and red themes are parked. The hook still exists so older call sites
+ * compile, but every path forces <html class="dark"> and never theme-red.
  */
 
 import { useCallback, useSyncExternalStore } from "react";
 
-export type Theme = "dark" | "light" | "red";
-export const THEMES: readonly Theme[] = ["dark", "light", "red"] as const;
+export type Theme = "dark";
+export const THEMES: readonly Theme[] = ["dark"] as const;
 
 const STORAGE_KEY = "rede-now-theme";
 const listeners = new Set<() => void>();
 
-function readStored(): Theme {
-  if (typeof window === "undefined") return "dark";
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === "light" || raw === "dark" || raw === "red") return raw;
-    // Legacy "system" value from the old two-theme toggle.
-    if (raw === "system") {
-      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    }
-  } catch { /* storage unavailable */ }
-  return "dark";
-}
-
-let current: Theme = readStored();
-
-function applyTheme(theme: Theme) {
+function applyDark() {
+  if (typeof document === "undefined") return;
   const root = document.documentElement;
-  root.classList.toggle("dark", theme !== "light");
-  root.classList.toggle("theme-red", theme === "red");
+  root.classList.add("dark");
+  root.classList.remove("theme-red");
 }
 
-if (typeof window !== "undefined") applyTheme(current);
+let current: Theme = "dark";
 
-function setThemeGlobal(next: Theme) {
-  current = next;
-  applyTheme(next);
-  try { localStorage.setItem(STORAGE_KEY, next); } catch { /* storage unavailable */ }
+if (typeof window !== "undefined") {
+  applyDark();
+  try {
+    localStorage.setItem(STORAGE_KEY, "dark");
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function setThemeGlobal(_next: Theme) {
+  current = "dark";
+  applyDark();
+  try {
+    localStorage.setItem(STORAGE_KEY, "dark");
+  } catch {
+    /* storage unavailable */
+  }
   listeners.forEach((fn) => fn());
 }
 
@@ -55,16 +47,13 @@ function subscribe(fn: () => void) {
   return () => listeners.delete(fn);
 }
 
-/** Inline pre-paint script for <head>; keep in sync with applyTheme(). */
-export const themeInitScript = `(function(){try{var t=localStorage.getItem('${STORAGE_KEY}');if(t==='system')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';var c=document.documentElement.classList;c.toggle('dark',t!=='light');c.toggle('theme-red',t==='red');}catch(e){}})();`;
+/** Inline pre-paint script for <head> — always dark. */
+export const themeInitScript = `(function(){try{var c=document.documentElement.classList;c.add('dark');c.remove('theme-red');localStorage.setItem('${STORAGE_KEY}','dark');}catch(e){}})();`;
 
 export function useTheme() {
   const theme = useSyncExternalStore(subscribe, () => current, () => "dark" as Theme);
   const setTheme = useCallback((next: Theme) => setThemeGlobal(next), []);
-  // Cycles dark → light → red. Kept for older call sites.
-  const toggle = useCallback(() => {
-    setThemeGlobal(THEMES[(THEMES.indexOf(current) + 1) % THEMES.length] ?? "dark");
-  }, []);
+  const toggle = useCallback(() => setThemeGlobal("dark"), []);
 
-  return { theme, resolved: theme, setTheme, toggle, isDark: theme !== "light" } as const;
+  return { theme, resolved: theme, setTheme, toggle, isDark: true } as const;
 }

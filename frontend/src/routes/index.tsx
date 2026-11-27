@@ -4,7 +4,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowRight, ArrowUpRight, CalendarDays, ClipboardCheck, ClipboardList, History, ListOrdered, PackagePlus,
 } from "lucide-react";
-import { ThemeTabs, Wordmark, labelClass } from "@/components/common";
+import { Wordmark, labelClass } from "@/components/common";
 import { ButtonLink, focusRing, quietLink } from "@/components/landing/ButtonLink";
 import { PickupBoardPreview } from "@/components/landing/PickupBoardPreview";
 import { Reveal, StackingSteps, type Step } from "@/components/landing/ScrollSections";
@@ -124,10 +124,6 @@ function Nav() {
             <ArrowUpRight size={14} aria-hidden="true" />
           </ButtonLink>
         </nav>
-
-        <div className="absolute right-0 top-1/2 hidden -translate-y-1/2 sm:block md:right-2">
-          <ThemeTabs compact className="shrink-0" />
-        </div>
       </div>
     </header>
   );
@@ -303,9 +299,8 @@ function Footer() {
         </nav>
       </div>
       <div className="border-t border-border">
-        <div className={cn(container, "flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between")}>
+        <div className={cn(container, "py-6")}>
           <p className="text-[13px] text-muted-foreground">© {new Date().getFullYear()} Red-E Now</p>
-          <ThemeTabs />
         </div>
       </div>
     </footer>

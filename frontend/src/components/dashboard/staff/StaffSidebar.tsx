@@ -10,7 +10,7 @@ import { useId, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { LayoutGroup, motion } from "framer-motion";
 import { LogOut, X } from "lucide-react";
-import { Avatar, Button, ThemeTabs } from "@/components/common";
+import { Avatar, Button } from "@/components/common";
 import { cn } from "@/lib/utils";
 import { BuildingName, useStaff } from "./StaffContext";
 import { NAV_GROUPS, type SectionName } from "./StaffTypes";
@@ -131,17 +131,11 @@ function Brand({ children }: { children?: ReactNode }) {
   );
 }
 
-function Footer({ showTheme = false, pillId }: { showTheme?: boolean; pillId: string }) {
+function Footer({ pillId }: { pillId: string }) {
   const { user, logout, choose, section } = useStaff();
   const accountActive = section === "Account";
   return (
     <div className="shrink-0 space-y-2 border-t border-sidebar-border p-3">
-      {showTheme && (
-        <div className="flex items-center justify-between gap-3 px-2.5 py-1">
-          <span className="text-[13px] text-muted-foreground">Theme</span>
-          <ThemeTabs compact />
-        </div>
-      )}
       <button
         type="button"
         onClick={() => choose("Account")}
@@ -171,11 +165,11 @@ function Footer({ showTheme = false, pillId }: { showTheme?: boolean; pillId: st
   );
 }
 
-function SidebarBody({ roomy = false, showTheme = false, pillId }: { roomy?: boolean; showTheme?: boolean; pillId: string }) {
+function SidebarBody({ roomy = false, pillId }: { roomy?: boolean; pillId: string }) {
   return (
     <LayoutGroup id={pillId}>
       <NavList roomy={roomy} pillId={pillId} />
-      <Footer showTheme={showTheme} pillId={pillId} />
+      <Footer pillId={pillId} />
     </LayoutGroup>
   );
 }
@@ -220,7 +214,7 @@ export function StaffSidebar() {
                 </Button>
               </Dialog.Close>
             </Brand>
-            <SidebarBody roomy showTheme pillId="staff-nav-mobile" />
+            <SidebarBody roomy pillId="staff-nav-mobile" />
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

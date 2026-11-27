@@ -1,8 +1,8 @@
 /**
- * Profile tab — who is signed in, the theme switcher and sign out.
+ * Profile tab — who is signed in, and sign out.
  */
 import { LogOut } from "lucide-react";
-import { Avatar, Button, Card, ThemeTabs, labelClass } from "@/components/common";
+import { Avatar, Button, Card } from "@/components/common";
 import type { User } from "@/context/AuthContext";
 import { PageHeader, touchButton } from "./parts";
 
@@ -43,12 +43,6 @@ export function ProfileTab({ user, buildingName, onSignOut }: { user: User | nul
               <DetailRow label="Account">Resident</DetailRow>
             )}
           </dl>
-        </Card>
-
-        <Card className="rounded-2xl p-4">
-          <p className={labelClass} id="appearance-label">Appearance</p>
-          <p className="mt-0.5 text-sm text-muted-foreground">Dark, light or red. Saved on this device.</p>
-          <ThemeTabs className="mt-3 flex w-full [&>button]:h-11 [&>button]:flex-1 [&>button]:rounded-xl" />
         </Card>
 
         <Button variant="secondary" fullWidth className={`${touchButton} rounded-xl`} onClick={onSignOut}>

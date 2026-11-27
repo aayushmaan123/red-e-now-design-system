@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import { Menu, Search } from "lucide-react";
-import { Avatar, Button, Kbd, ThemeTabs } from "@/components/common";
+import { Avatar, Button, Kbd } from "@/components/common";
 import { cn } from "@/lib/utils";
 import { BuildingName, useStaff } from "./StaffContext";
 import { sectionTitle } from "./StaffTypes";
@@ -68,8 +68,6 @@ export function StaffHeader() {
           <span className="hidden flex-1 text-left md:inline">Search…</span>
           <Kbd className="hidden bg-muted md:inline-flex">{shortcut}</Kbd>
         </button>
-
-        <ThemeTabs compact className="hidden sm:inline-flex" />
 
         <button
           type="button"

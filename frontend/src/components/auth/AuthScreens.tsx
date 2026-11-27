@@ -14,7 +14,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, CircleAlert } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Button, LoadingSpinner, TextInput, ThemeTabs, Wordmark, labelClass } from "@/components/common";
+import { Button, LoadingSpinner, TextInput, Wordmark, labelClass } from "@/components/common";
 import { focusRing, quietLink, textLink } from "@/components/landing/ButtonLink";
 import { PickupBoardPreview } from "@/components/landing/PickupBoardPreview";
 import { useAuth } from "@/hooks/useAuth";
@@ -111,9 +111,8 @@ function AuthFrame({
   return (
     <div className="relative grid min-h-dvh text-foreground lg:grid-cols-2">
       <div className="flex min-h-dvh flex-col bg-background/70 px-5 sm:px-10 backdrop-blur-sm">
-        <header className="flex h-16 shrink-0 items-center justify-between gap-4">
+        <header className="flex h-16 shrink-0 items-center gap-4">
           <Wordmark />
-          <ThemeTabs compact />
         </header>
 
         <main className="animate-in fade-in fill-mode-both mx-auto my-auto w-full max-w-[380px] py-8 duration-500 sm:py-12">
